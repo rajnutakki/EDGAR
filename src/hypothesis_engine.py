@@ -37,7 +37,16 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-def compute_initial_params(param_estimator, model, x, y):
+def _fn_accepts_metadata(fn) -> bool:
+    """Check if a callable accepts a 'metadata' keyword argument."""
+    try:
+        sig = inspect.signature(fn)
+        return "metadata" in sig.parameters
+    except (ValueError, TypeError):
+        return False
+
+
+def compute_initial_params(param_estimator, model, x, y, metadata=None):
     """
     Estimate per-sample initial model parameters with safe fallbacks.
 
@@ -53,14 +62,21 @@ def compute_initial_params(param_estimator, model, x, y):
         x (np.ndarray): Input tensor of shape ``(n_samples, n_features, n_trials)``.
         y (np.ndarray): Output tensor of shape
             ``(n_samples, n_targets, n_trials)`` or ``(n_samples, n_trials)``.
+        metadata (dict | None): Optional metadata dict from the Inputs object.
+            If the param_estimator accepts a ``metadata`` kwarg, this will be
+            passed through.
 
     Returns:
         pytree | None: Batched parameter pytree with leading sample axis for each
             leaf. Returns ``None`` when both estimator-based initialization and
             default-parameter fallback fail.
     """
+    pass_meta = metadata and _fn_accepts_metadata(param_estimator)
+
     @timeout_decorator.timeout(5, use_signals=True)
     def _safe_estimate(pe, xi, yi):
+        if pass_meta:
+            return pe(xi, yi, metadata=metadata)
         return pe(xi, yi)
 
     def _estimator_response_arg(yi):
@@ -318,22 +334,37 @@ def objective(model, param_estimator, x, y,
     if not (isinstance(y, (list, tuple, np.ndarray)) and len(y) == 2):
         raise ValueError("objective expects y as length-2 container: [y_train_trials, y_test_trials].")
 
-    x_train = ensure_inputs(x[0]).to_tensor()
-    x_test = ensure_inputs(x[1]).to_tensor()
+    x_train_inputs = ensure_inputs(x[0])
+    x_test_inputs = ensure_inputs(x[1])
+    x_train = x_train_inputs.to_tensor()
+    x_test = x_test_inputs.to_tensor()
     y_train_outputs = ensure_outputs(y[0])
     y_test_outputs = ensure_outputs(y[1])
     y_train = y_train_outputs.data
     y_test = y_test_outputs.data
 
+    # Extract metadata from inputs (for models/estimators that accept it).
+    x_train_metadata = x_train_inputs.metadata if x_train_inputs.metadata else None
+
+    # If the model accepts metadata, wrap it in a closure so the vmap-compatible
+    # signature remains model(x_i, params).
+    if x_train_metadata and _fn_accepts_metadata(model):
+        _raw_model = model
+        def model(x_i, params):  # noqa: F811 – intentional rebinding
+            return _raw_model(x_i, params, metadata=x_train_metadata)
+
     n_samples, n_features, _ = x_train.shape
     n_targets = y_train_outputs.n_targets
-    
+
     try:
         _check_timeout()
         # Compute initial parameters
         # param_estimator receives y as (n_targets, n_trials) for each sample
         if use_param_estimator:
-            initial_params = compute_initial_params(param_estimator, model, np.asarray(x_train), np.asarray(y_train))
+            initial_params = compute_initial_params(
+                param_estimator, model, np.asarray(x_train), np.asarray(y_train),
+                metadata=x_train_metadata,
+            )
         else:
             initial_params = compute_default_params(model)
     except ObjectiveTimeout:
@@ -634,14 +665,15 @@ def _call_objective(use_simple_objective: bool, **kwargs):
     return objective(**kwargs)
 
 
-def _programs_df_to_programs_list(programs_df: pd.DataFrame, 
+def _programs_df_to_programs_list(programs_df: pd.DataFrame,
                                     loss_func: callable,
                                     x: jnp.ndarray, y: jnp.ndarray,
-                                    complexity_penalty: float = 0.0) -> list[dict]:
+                                    complexity_penalty: float = 0.0,
+                                    metadata: dict | None = None) -> list[dict]:
     """
     Convert a programs dataframe to the canonical programs_list plotting payload.
-    Compute per sample losses for each program using the provided loss function, 
-    and include them in the programs_list dicts under the key 'losses'. 
+    Compute per sample losses for each program using the provided loss function,
+    and include them in the programs_list dicts under the key 'losses'.
     This allows the plotting function to visualize the performance of each program.
 
     Args:
@@ -651,12 +683,17 @@ def _programs_df_to_programs_list(programs_df: pd.DataFrame,
     y (jnp.ndarray): (n_samples, n_targets, n_trials) true output data used for computing losses.
     complexity_penalty (float): Additive complexity penalty multiplier.
         Each sample loss is increased by ``complexity_penalty * n_free_params``.
+    metadata (dict | None): Optional metadata dict from the Inputs object.
     """
     programs_list = []
     if programs_df is None or len(programs_df) == 0:
         return programs_list
-    x_arr = jnp.asarray(ensure_inputs(x).to_tensor())
+    x_inputs = ensure_inputs(x)
+    x_arr = jnp.asarray(x_inputs.to_tensor())
     y_arr = jnp.asarray(ensure_outputs(y).to_tensor())
+    # Use metadata from the Inputs object if not explicitly provided.
+    if metadata is None and x_inputs.metadata:
+        metadata = x_inputs.metadata
     n_samples = x_arr.shape[0]
 
     if loss_func is None:
@@ -667,11 +704,17 @@ def _programs_df_to_programs_list(programs_df: pd.DataFrame,
         params = row.get('params')
         if model is None or params is None:
             continue
+        # Wrap model with metadata closure if it accepts a metadata kwarg.
+        eval_model = model
+        if metadata and _fn_accepts_metadata(model):
+            _raw = model
+            def eval_model(x_i, params, _m=_raw, _md=metadata):
+                return _m(x_i, params, metadata=_md)
         params_tree = utils.broadcast_params(params, n_samples)
         n_free_params_raw = utils.params_numel_per_sample(params_tree, n_samples=n_samples)
         penalty_denom = max(1, int(x_arr.shape[1]) * int(y_arr.shape[1]))
         n_free_params = n_free_params_raw / penalty_denom
-        y_pred = utils.vmap_over_samples(model)(x_arr, params_tree)
+        y_pred = utils.vmap_over_samples(eval_model)(x_arr, params_tree)
         if y_pred.ndim == 2 and y_arr.ndim == 3 and y_arr.shape[1] == 1:
             y_pred = y_pred[:, None, :]
         raw_losses = jnp.asarray(loss_func(y_pred, y_arr))

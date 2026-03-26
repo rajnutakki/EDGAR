@@ -16,6 +16,37 @@ import jax.numpy as jnp
 ArrayLike = Union[np.ndarray, jnp.ndarray]
 
 
+def _slice_metadata_trials(
+    metadata: Dict[str, ArrayLike], indices: ArrayLike
+) -> Dict[str, ArrayLike]:
+    """Slice each metadata array along its last axis (assumed to be the trial axis)."""
+    out = {}
+    for key, arr in metadata.items():
+        arr = np.asarray(arr)
+        if arr.ndim == 0:
+            out[key] = arr
+        else:
+            out[key] = arr[..., indices]
+    return out
+
+
+def _slice_metadata_samples(
+    metadata: Dict[str, ArrayLike], indices: ArrayLike
+) -> Dict[str, ArrayLike]:
+    """Slice each metadata array along axis 0 if it has more than 1 dimension.
+
+    1-D metadata (e.g. per-trial labels with no sample axis) is left unchanged.
+    """
+    out = {}
+    for key, arr in metadata.items():
+        arr = np.asarray(arr)
+        if arr.ndim >= 2:
+            out[key] = arr[indices]
+        else:
+            out[key] = arr
+    return out
+
+
 @dataclass
 class Inputs:
     """
@@ -51,23 +82,24 @@ class Inputs:
     """
     data: ArrayLike
     names: List[str] = field(default_factory=list)
-    
+    metadata: Dict[str, ArrayLike] = field(default_factory=dict)
+
     def __post_init__(self):
         """Validate and normalize the data to 3D format."""
         # Convert to array if needed
         if not isinstance(self.data, (np.ndarray, jnp.ndarray)):
             self.data = np.asarray(self.data)
-        
+
         # Auto-expand 2D to 3D: (n_samples, n_trials) -> (n_samples, 1, n_trials)
         if self.data.ndim == 2:
             self.data = self.data[:, np.newaxis, :]
-        
+
         if self.data.ndim != 3:
             raise ValueError(
                 f"Inputs data must be 2D (n_samples, n_trials) or "
                 f"3D (n_samples, n_features, n_trials), got shape {self.data.shape}"
             )
-        
+
         # Auto-generate names if not provided
         n_features = self.data.shape[1]
         if not self.names:
@@ -80,39 +112,44 @@ class Inputs:
     
     @classmethod
     def from_array(
-        cls, 
-        data: ArrayLike, 
-        names: Optional[List[str]] = None
+        cls,
+        data: ArrayLike,
+        names: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, ArrayLike]] = None,
     ) -> Inputs:
         """
         Create Inputs from a numpy/jax array.
-        
+
         Args:
             data: Array of shape (n_samples, n_trials) or (n_samples, n_features, n_trials)
             names: Optional list of input variable names
-            
+            metadata: Optional dict of per-trial (or arbitrary-shape) arrays that travel
+                with the data but are not part of the main tensor (e.g. stimulus labels).
+
         Returns:
             Inputs instance
         """
-        return cls(data=data, names=names or [])
-    
+        return cls(data=data, names=names or [], metadata=metadata or {})
+
     @classmethod
     def from_dict(
-        cls, 
+        cls,
         inputs_dict: Dict[str, ArrayLike],
-        order: Optional[List[str]] = None
+        order: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, ArrayLike]] = None,
     ) -> Inputs:
         """
         Create Inputs from a dictionary of named arrays.
-        
+
         Args:
             inputs_dict: Dict mapping input variable names to arrays of shape (n_samples, n_trials)
-            order: Optional list specifying the order of inputs. 
+            order: Optional list specifying the order of inputs.
                    If None, uses dict iteration order.
-                   
+            metadata: Optional dict of per-trial (or arbitrary-shape) arrays.
+
         Returns:
             Inputs instance
-            
+
         Example:
             >>> inputs = Inputs.from_dict({
             ...     'theta': angles,  # (n_samples, n_trials)
@@ -127,19 +164,19 @@ class Inputs:
                 raise ValueError(
                     f"Order {order} doesn't match dict keys {list(inputs_dict.keys())}"
                 )
-        
+
         # Stack arrays along new axis
         arrays = [inputs_dict[name] for name in order]
-        
+
         # Validate shapes match
         shapes = [arr.shape for arr in arrays]
         if len(set(shapes)) > 1:
             raise ValueError(f"All input arrays must have the same shape, got {shapes}")
-        
+
         # Stack: each array is (n_samples, n_trials) -> result is (n_samples, n_features, n_trials)
         stacked = np.stack(arrays, axis=1)
-        
-        return cls(data=stacked, names=order)
+
+        return cls(data=stacked, names=order, metadata=metadata or {})
     
     @property
     def shape(self) -> tuple:
@@ -233,43 +270,46 @@ class Inputs:
     def slice_samples(self, indices: ArrayLike) -> Inputs:
         """
         Create a new Inputs with a subset of samples.
-        
+
         Args:
             indices: Array of sample indices to select
-            
+
         Returns:
             New Inputs instance with selected samples
         """
-        return Inputs(data=self.data[indices], names=self.names.copy())
-    
+        new_meta = _slice_metadata_samples(self.metadata, indices)
+        return Inputs(data=self.data[indices], names=self.names.copy(), metadata=new_meta)
+
     def slice_trials(self, indices: ArrayLike) -> Inputs:
         """
         Create a new Inputs with a subset of trials.
-        
+
         Args:
             indices: Array of trial indices to select
-            
+
         Returns:
             New Inputs instance with selected trials
         """
-        return Inputs(data=self.data[:, :, indices], names=self.names.copy())
-    
+        new_meta = _slice_metadata_trials(self.metadata, indices)
+        return Inputs(data=self.data[:, :, indices], names=self.names.copy(), metadata=new_meta)
+
     def as_jax(self) -> Inputs:
         """Convert internal data to JAX array."""
         if isinstance(self.data, jnp.ndarray):
             return self
-        return Inputs(data=jnp.asarray(self.data), names=self.names.copy())
-    
+        return Inputs(data=jnp.asarray(self.data), names=self.names.copy(), metadata=self.metadata.copy())
+
     def as_numpy(self) -> Inputs:
         """Convert internal data to NumPy array."""
         if isinstance(self.data, np.ndarray):
             return self
-        return Inputs(data=np.asarray(self.data), names=self.names.copy())
-    
+        return Inputs(data=np.asarray(self.data), names=self.names.copy(), metadata=self.metadata.copy())
+
     def __repr__(self) -> str:
+        meta_keys = list(self.metadata.keys()) if self.metadata else []
         return (
             f"Inputs(shape={self.shape}, names={self.names}, "
-            f"dtype={self.data.dtype})"
+            f"dtype={self.data.dtype}, metadata_keys={meta_keys})"
         )
     
     def __len__(self) -> int:
@@ -279,37 +319,32 @@ class Inputs:
 
 def ensure_inputs(
     x: Union[ArrayLike, Inputs, Dict[str, ArrayLike]],
-    names: Optional[List[str]] = None
+    names: Optional[List[str]] = None,
+    metadata: Optional[Dict[str, ArrayLike]] = None,
 ) -> Inputs:
     """
     Convert various input formats to a Inputs object.
-    
+
     This is the main entry point for backward compatibility. It accepts:
-    - Inputs: returned as-is
+    - Inputs: returned as-is (metadata arg ignored)
     - 2D array (n_samples, n_trials): wrapped as single input
     - 3D array (n_samples, n_features, n_trials): wrapped directly
     - Dict of arrays: converted via from_dict
-    
+
     Args:
         x: Input data in any supported format
         names: Optional input names (used for array inputs)
-        
+        metadata: Optional metadata dict (only used when *x* is an array or dict)
+
     Returns:
         Inputs instance
-        
-    Example:
-        # All of these work:
-        >>> ensure_inputs(angles_2d)  # (n_samples, n_trials)
-        >>> ensure_inputs(angles_3d)  # (n_samples, n_features, n_trials)  
-        >>> ensure_inputs({'theta': angles, 'speed': speeds})
-        >>> ensure_inputs(existing_inputs)
     """
     if isinstance(x, Inputs):
         return x
     elif isinstance(x, dict):
-        return Inputs.from_dict(x, order=names)
+        return Inputs.from_dict(x, order=names, metadata=metadata)
     else:
-        return Inputs.from_array(x, names=names)
+        return Inputs.from_array(x, names=names, metadata=metadata)
 
 @dataclass
 class Outputs:
@@ -349,24 +384,25 @@ class Outputs:
     """
     data: ArrayLike
     names: List[str] = field(default_factory=list)
-    
+    metadata: Dict[str, ArrayLike] = field(default_factory=dict)
+
     def __post_init__(self):
         """Validate and normalize the data to 3D format."""
         # Convert to array if needed
         if not isinstance(self.data, (np.ndarray, jnp.ndarray)):
             self.data = np.asarray(self.data)
-        
+
         # Auto-expand 2D to 3D: (n_samples, n_trials) -> (n_samples, 1, n_trials)
         # This provides backward compatibility with scalar outputs
         if self.data.ndim == 2:
             self.data = self.data[:, np.newaxis, :]
-        
+
         if self.data.ndim != 3:
             raise ValueError(
                 f"Outputs data must be 2D (n_samples, n_trials) or "
                 f"3D (n_samples, n_targets, n_trials), got shape {self.data.shape}"
             )
-        
+
         # Auto-generate names if not provided
         n_targets = self.data.shape[1]
         if not self.names:
@@ -379,39 +415,43 @@ class Outputs:
     
     @classmethod
     def from_array(
-        cls, 
-        data: ArrayLike, 
-        names: Optional[List[str]] = None
+        cls,
+        data: ArrayLike,
+        names: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, ArrayLike]] = None,
     ) -> Outputs:
         """
         Create Outputs from a numpy/jax array.
-        
+
         Args:
             data: Array of shape (n_samples, n_trials) or (n_samples, n_targets, n_trials)
             names: Optional list of output/target names
-            
+            metadata: Optional dict of per-trial (or arbitrary-shape) arrays.
+
         Returns:
             Outputs instance
         """
-        return cls(data=data, names=names or [])
-    
+        return cls(data=data, names=names or [], metadata=metadata or {})
+
     @classmethod
     def from_dict(
-        cls, 
+        cls,
         outputs_dict: Dict[str, ArrayLike],
-        order: Optional[List[str]] = None
+        order: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, ArrayLike]] = None,
     ) -> Outputs:
         """
         Create Outputs from a dictionary of named arrays.
-        
+
         Args:
             outputs_dict: Dict mapping output names to arrays of shape (n_samples, n_trials)
-            order: Optional list specifying the order of outputs. 
+            order: Optional list specifying the order of outputs.
                    If None, uses dict iteration order.
-                   
+            metadata: Optional dict of per-trial (or arbitrary-shape) arrays.
+
         Returns:
             Outputs instance
-            
+
         Example:
             >>> outputs = Outputs.from_dict({
             ...     'cell_1': rates_1,  # (n_samples, n_trials)
@@ -426,19 +466,19 @@ class Outputs:
                 raise ValueError(
                     f"Order {order} doesn't match dict keys {list(outputs_dict.keys())}"
                 )
-        
+
         # Stack arrays along new axis
         arrays = [outputs_dict[name] for name in order]
-        
+
         # Validate shapes match
         shapes = [arr.shape for arr in arrays]
         if len(set(shapes)) > 1:
             raise ValueError(f"All output arrays must have the same shape, got {shapes}")
-        
+
         # Stack: each array is (n_samples, n_trials) -> result is (n_samples, n_targets, n_trials)
         stacked = np.stack(arrays, axis=1)
-        
-        return cls(data=stacked, names=order)
+
+        return cls(data=stacked, names=order, metadata=metadata or {})
     
     @property
     def shape(self) -> tuple:
@@ -554,34 +594,36 @@ class Outputs:
     def slice_samples(self, indices: ArrayLike) -> Outputs:
         """
         Create a new Outputs with a subset of samples.
-        
+
         Args:
             indices: Array of sample indices to select
-            
+
         Returns:
             New Outputs instance with selected samples
         """
-        return Outputs(data=self.data[indices], names=self.names.copy())
-    
+        new_meta = _slice_metadata_samples(self.metadata, indices)
+        return Outputs(data=self.data[indices], names=self.names.copy(), metadata=new_meta)
+
     def slice_trials(self, indices: ArrayLike) -> Outputs:
         """
         Create a new Outputs with a subset of trials.
-        
+
         Args:
             indices: Array of trial indices to select
-            
+
         Returns:
             New Outputs instance with selected trials
         """
-        return Outputs(data=self.data[:, :, indices], names=self.names.copy())
-    
+        new_meta = _slice_metadata_trials(self.metadata, indices)
+        return Outputs(data=self.data[:, :, indices], names=self.names.copy(), metadata=new_meta)
+
     def slice_targets(self, indices: Union[ArrayLike, List[int], List[str]]) -> Outputs:
         """
         Create a new Outputs with a subset of targets.
-        
+
         Args:
             indices: Array of target indices or list of target names to select
-            
+
         Returns:
             New Outputs instance with selected targets
         """
@@ -592,25 +634,26 @@ class Outputs:
         else:
             int_indices = list(indices)
             new_names = [self.names[i] for i in int_indices]
-        
-        return Outputs(data=self.data[:, int_indices, :], names=new_names)
-    
+
+        return Outputs(data=self.data[:, int_indices, :], names=new_names, metadata=self.metadata.copy())
+
     def as_jax(self) -> Outputs:
         """Convert internal data to JAX array."""
         if isinstance(self.data, jnp.ndarray):
             return self
-        return Outputs(data=jnp.asarray(self.data), names=self.names.copy())
-    
+        return Outputs(data=jnp.asarray(self.data), names=self.names.copy(), metadata=self.metadata.copy())
+
     def as_numpy(self) -> Outputs:
         """Convert internal data to NumPy array."""
         if isinstance(self.data, np.ndarray):
             return self
-        return Outputs(data=np.asarray(self.data), names=self.names.copy())
-    
+        return Outputs(data=np.asarray(self.data), names=self.names.copy(), metadata=self.metadata.copy())
+
     def __repr__(self) -> str:
+        meta_keys = list(self.metadata.keys()) if self.metadata else []
         return (
             f"Outputs(shape={self.shape}, names={self.names}, "
-            f"dtype={self.data.dtype}, is_scalar={self.is_scalar})"
+            f"dtype={self.data.dtype}, is_scalar={self.is_scalar}, metadata_keys={meta_keys})"
         )
     
     def __len__(self) -> int:
@@ -620,34 +663,29 @@ class Outputs:
 
 def ensure_outputs(
     y: Union[ArrayLike, Outputs, Dict[str, ArrayLike]],
-    names: Optional[List[str]] = None
+    names: Optional[List[str]] = None,
+    metadata: Optional[Dict[str, ArrayLike]] = None,
 ) -> Outputs:
     """
     Convert various output formats to an Outputs object.
-    
+
     This is the main entry point for backward compatibility. It accepts:
-    - Outputs: returned as-is
+    - Outputs: returned as-is (metadata arg ignored)
     - 2D array (n_samples, n_trials): wrapped as single target (scalar output)
     - 3D array (n_samples, n_targets, n_trials): wrapped directly (vectorized output)
     - Dict of arrays: converted via from_dict
-    
+
     Args:
         y: Output data in any supported format
         names: Optional target names (used for array inputs)
-        
+        metadata: Optional metadata dict (only used when *y* is an array or dict)
+
     Returns:
         Outputs instance
-        
-    Example:
-        # All of these work:
-        >>> ensure_outputs(firing_rates_2d)  # (n_samples, n_trials) -> scalar
-        >>> ensure_outputs(firing_rates_3d)  # (n_samples, n_targets, n_trials) -> vectorized
-        >>> ensure_outputs({'cell_1': rates_1, 'cell_2': rates_2})
-        >>> ensure_outputs(existing_outputs)
     """
     if isinstance(y, Outputs):
         return y
     elif isinstance(y, dict):
-        return Outputs.from_dict(y, order=names)
+        return Outputs.from_dict(y, order=names, metadata=metadata)
     else:
-        return Outputs.from_array(y, names=names)
+        return Outputs.from_array(y, names=names, metadata=metadata)

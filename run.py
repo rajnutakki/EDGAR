@@ -7,7 +7,10 @@ import inspect
 import numpy as np
 from src import hypothesis_engine, utils
 from src.prompt_manager import PromptManager
-from src.data_structures import Inputs, Outputs, ensure_inputs, ensure_outputs
+from src.data_structures import (
+    Inputs, Outputs, ensure_inputs, ensure_outputs,
+    _slice_metadata_trials, _slice_metadata_samples,
+)
 from src.data_summary import save_data_summary
 
 
@@ -75,6 +78,7 @@ def _build_load_and_process_data_fn(spec_load_and_process_data_fn):
     canonical NumPy tensors:
       - inputs:  (n_samples, n_features, n_trials)
       - outputs: (n_samples, n_targets, n_trials)
+    Plus optional metadata dicts carried as sidecars.
     """
     def _wrapped_load_and_process_data_fn(**kwargs):
         data_obj = spec_load_and_process_data_fn(**kwargs)
@@ -104,7 +108,10 @@ def _build_load_and_process_data_fn(spec_load_and_process_data_fn):
                 "Current engine expects matching input/output trial counts, got "
                 f"n_trials_x={inputs.shape[2]}, n_trials_y={outputs.shape[2]}."
             )
-        return inputs, outputs
+        # Carry metadata alongside the raw tensors
+        inputs_metadata = inputs_obj.metadata
+        outputs_metadata = outputs_obj.metadata
+        return inputs, outputs, inputs_metadata, outputs_metadata
 
     return _wrapped_load_and_process_data_fn
 
@@ -114,11 +121,24 @@ def _build_train_test_split_fn(spec_train_test_split_fn):
     Wrap spec.train_test_split so hypothesis_engine gets fully materialized
     sample+trial train/test indices.
     """
-    def _wrapped_train_test_split_fn(inputs_3d: np.ndarray, random_seed: int):
-        train_samples_raw, train_trials_raw = spec_train_test_split_fn(
-            Inputs.from_array(inputs_3d),
-            random_seed,
-        )
+    # Check if the spec's split function accepts a metadata kwarg.
+    _sig = inspect.signature(spec_train_test_split_fn)
+    _accepts_metadata = "metadata" in _sig.parameters
+
+    def _wrapped_train_test_split_fn(
+        inputs_3d: np.ndarray,
+        random_seed: int,
+        inputs_metadata: dict | None = None,
+    ):
+        inputs_obj = Inputs.from_array(inputs_3d, metadata=inputs_metadata or {})
+        if _accepts_metadata:
+            train_samples_raw, train_trials_raw = spec_train_test_split_fn(
+                inputs_obj, random_seed, metadata=inputs_metadata or {},
+            )
+        else:
+            train_samples_raw, train_trials_raw = spec_train_test_split_fn(
+                inputs_obj, random_seed,
+            )
         n_samples = int(inputs_3d.shape[0])
         n_trials = int(inputs_3d.shape[2])
         train_samples = np.asarray(train_samples_raw).reshape(-1).astype(np.int64, copy=False)
@@ -417,10 +437,13 @@ async def _run_many(test_mode: bool = False, config_path: str = "config.yaml"):
 
     for i in range(params['num_runs']):
         random_seed = params.get('random_seed', 42)
-        inputs, outputs = load_and_process_data_fn(**data_processing_params)
+        inputs, outputs, inputs_metadata, outputs_metadata = load_and_process_data_fn(
+            **data_processing_params
+        )
         train_samples, test_samples, train_trials, test_trials = train_test_split_fn(
             inputs,
             random_seed,
+            inputs_metadata=inputs_metadata,
         )
         train_samples = np.asarray(train_samples).reshape(-1).astype(np.int64, copy=False)
         test_samples = np.asarray(test_samples).reshape(-1).astype(np.int64, copy=False)
@@ -447,16 +470,32 @@ async def _run_many(test_mode: bool = False, config_path: str = "config.yaml"):
         Y_test_train_trials = _zscore_trials(Y_test_train_trials)
         Y_test_test_trials = _zscore_trials(Y_test_test_trials)
 
+        # Slice metadata by sample and trial indices (metadata is never z-scored).
+        def _split_metadata(meta, sample_idx, trial_idx):
+            return _slice_metadata_trials(
+                _slice_metadata_samples(meta, sample_idx), trial_idx
+            )
+
+        xm_tt = _split_metadata(inputs_metadata, train_samples, train_trials)
+        xm_te = _split_metadata(inputs_metadata, train_samples, test_trials)
+        xm_et = _split_metadata(inputs_metadata, test_samples, train_trials)
+        xm_ee = _split_metadata(inputs_metadata, test_samples, test_trials)
+
+        ym_tt = _split_metadata(outputs_metadata, train_samples, train_trials)
+        ym_te = _split_metadata(outputs_metadata, train_samples, test_trials)
+        ym_et = _split_metadata(outputs_metadata, test_samples, train_trials)
+        ym_ee = _split_metadata(outputs_metadata, test_samples, test_trials)
+
         X = np.empty((2, 2), dtype=object)
         Y = np.empty((2, 2), dtype=object)
-        X[0, 0] = Inputs.from_array(X_train_train_trials)
-        X[0, 1] = Inputs.from_array(X_train_test_trials)
-        X[1, 0] = Inputs.from_array(X_test_train_trials)
-        X[1, 1] = Inputs.from_array(X_test_test_trials)
-        Y[0, 0] = Outputs.from_array(Y_train_train_trials)
-        Y[0, 1] = Outputs.from_array(Y_train_test_trials)
-        Y[1, 0] = Outputs.from_array(Y_test_train_trials)
-        Y[1, 1] = Outputs.from_array(Y_test_test_trials)
+        X[0, 0] = Inputs.from_array(X_train_train_trials, metadata=xm_tt)
+        X[0, 1] = Inputs.from_array(X_train_test_trials, metadata=xm_te)
+        X[1, 0] = Inputs.from_array(X_test_train_trials, metadata=xm_et)
+        X[1, 1] = Inputs.from_array(X_test_test_trials, metadata=xm_ee)
+        Y[0, 0] = Outputs.from_array(Y_train_train_trials, metadata=ym_tt)
+        Y[0, 1] = Outputs.from_array(Y_train_test_trials, metadata=ym_te)
+        Y[1, 0] = Outputs.from_array(Y_test_train_trials, metadata=ym_et)
+        Y[1, 1] = Outputs.from_array(Y_test_test_trials, metadata=ym_ee)
 
         X_eval = utils.build_evaluation_points(
             inputs=X[0, 0],
