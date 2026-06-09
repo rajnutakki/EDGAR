@@ -560,4 +560,11 @@ def load_island_census(path: str) -> list[list[set[int]]]:
 
 
 def print_island(island: set[int]) -> None:
+    """Prints the contents of an island set.
+
+    This is a utility function primarily used for debugging or inspection.
+
+    Args:
+        island: A set of program indices representing an island.
+    """
     print(island)
