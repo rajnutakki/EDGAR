@@ -1,6 +1,3 @@
 def hello_world():
-    """Prints "Hello, world!" to the console.
-
-    This is a dummy function for testing and demonstration purposes.
-    """
+    """@docbot. Complete this hello world docstring."""
     print("Hello, world!")
