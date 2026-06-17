@@ -80,13 +80,14 @@ def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray) -> tu
     # Train: Mask out bottom right corner
     resp_train = resp.copy()
     resp_train[trial_mid:, cell_mid:] = np.nan
+    # Use 0.0 for signal to avoid NaN gradients during optimization
     sig_train = sig.copy()
-    sig_train[trial_mid:, cell_mid:] = np.nan
+    sig_train[trial_mid:, cell_mid:] = 0.0
 
     # Test: Mask out everything EXCEPT bottom right corner
     resp_test = np.full_like(resp, np.nan)
     resp_test[trial_mid:, cell_mid:] = resp[trial_mid:, cell_mid:]
-    sig_test = np.full_like(sig, np.nan)
+    sig_test = np.zeros_like(sig)
     sig_test[trial_mid:, cell_mid:] = sig[trial_mid:, cell_mid:]
 
     return (
@@ -209,14 +210,27 @@ def _plot_tuning_verification(all_resp, all_ang, bin_centers, avg_resp, seed):
     plt.savefig("tuning_curve_verification.png")
     plt.close()
 
-
 def loss_fn(model_output, data):
     """
-    Mean squared error loss, ignoring NaNs.
+    Mean squared error loss, safely ignoring NaNs for jax.grad.
+    Due to backpropagation in jax.grad need to ensure that there are no NaNs during the forward pass through the loss.
     Expects data['response'] of shape (n_samples, n_trials, n_cells).
     Returns (n_samples,) array of losses.
     """
+    # 1. Create a boolean mask (True where data is valid)
     mask = ~jnp.isnan(data["response"])
-    diff_sq = (data["response"] - model_output) ** 2
-    safe_diff_sq = jnp.where(mask, diff_sq, jnp.nan)
-    return jnp.nanmean(safe_diff_sq, axis=(-2, -1))
+
+    # 2. Clean the raw data and model output so the subtraction doesn't create NaNs
+    # Even if model_output has NaNs where mask is False, we replace them with 0.0
+    # to prevent them from poisoning the gradient.
+    clean_response = jnp.where(mask, data["response"], 0.0)
+    safe_model_output = jnp.where(mask, model_output, 0.0)
+
+    # 3. Compute squared error
+    diff_sq = (clean_response - safe_model_output) ** 2
+
+    # 4. Manually compute the mean across trials and cells (axis -2 and -1)
+    total_error = jnp.sum(diff_sq, axis=(-2, -1))
+    valid_count = jnp.sum(mask, axis=(-2, -1))
+
+    return 1e4 * total_error / valid_count

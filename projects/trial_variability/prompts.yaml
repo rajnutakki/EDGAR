@@ -125,3 +125,48 @@ parameter_estimator:
   - name
   - code.model
 
+jax_translator_model:
+  base: '
+    Translate the following model function to JAX-compatible code.
+
+    Ensure that keys of data and params dicts are preserved. 
+    
+    Ensure that the input and output behavior of the function is preserved.
+
+    Include all necessary imports (jax, jax.numpy as jnp).
+
+    Ensure compatibility with jax.jit, jax.grad, and jax.vmap.
+
+    Do not include any text other than the code, which consists of imports and the def model(data, params): function.
+
+    '
+  explore: null
+  exploit: null
+  code_guidelines: 'CRITICAL JAX compatibility requirements:
+
+    * Replace all boolean indexing with `jnp.where`.
+
+    * Use `jnp` everywhere (no `np`).
+
+    * Avoid Python control flow (if/for) that depends on array values.
+
+    * Never call Python `int()` / `float()` on JAX values. Use x.astype(float) instead.
+
+    * **Never** use string indexing like `x["..."]` or `x[":"]` for array axes.
+
+    * Ensure all string values in function call arguments are properly JSON-escaped
+    '
+  docstring_guidelines: '
+    Do not include a docstring.
+    '
+  image_analysis_instructions: null
+  parent_program_template: ''
+  parent_program_vars: []
+  current_program_template: 'Model code:
+
+    {code_model}
+
+    '
+  current_program_vars:
+  - code.model
+
