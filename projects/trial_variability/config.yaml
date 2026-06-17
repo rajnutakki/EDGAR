@@ -1,15 +1,15 @@
-run:
-  random_seed: 42
+# run:
+#   random_seed: 42
 io:
   data_path: "/home/rajah/datasets/BZ015"
   save_path: "/home/rajah/projects/trial_variability/run_output"
 
 evolution:
-  n_generations: 1
-  batch_size: 2
-  n_islands: 2
-  topology: [1, 0]
-  critical_population_size: 12
+  n_generations: 6
+  batch_size: 3
+  n_islands: 4
+  topology: [1, 2, 3, 0]
+  critical_population_size: 6
   n_migrants: 1
 
 llms:
@@ -17,7 +17,9 @@ llms:
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
 
+scoring:
+  param_penalty_weight: 0.0
+
 project_params:
-  random_seed: 42
   activity_thresh: 0.4
   conc_thresh: 0.55
