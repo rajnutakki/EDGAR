@@ -128,24 +128,29 @@ def load_data(
     responses_raw, angles_raw = _load_raw_data(data_paths)
     responses_filtered = _filter_cells(responses_raw, angles_raw, activity_thresh, conc_thresh)
 
-    # 2. Partition and Normalize
-    resp_disc = np.vstack(responses_filtered[:2])
-    ang_disc = np.concatenate(angles_raw[:2])
-    resp_val = responses_filtered[2]
-    ang_val = angles_raw[2]
+    # 2. Normalize, (optionally shuffle), partition
+    resp_all = np.vstack(responses_filtered)
+    ang_all = np.concatenate(angles_raw)
+    resp_all = normalization.by_vector_norm(resp_all, axis=0)
 
-    resp_disc = normalization.by_vector_norm(resp_disc, axis=0)
-    resp_val = normalization.by_vector_norm(resp_val, axis=0)
+    if shuffle_trials:
+        # Shuffle trials globally across all repeats before partitioning
+        rng = np.random.default_rng(random_seed)
+        shuffled_idx = rng.permutation(len(resp_all))
+        resp_all = resp_all[shuffled_idx]
+        ang_all = ang_all[shuffled_idx]
+
+    # Partition back into discovery and validation using 2/3 and 1/3 of the trials respectively
+    n_disc = sum(r.shape[0] for r in responses_filtered[:2])
+    resp_disc = resp_all[:n_disc]
+    ang_disc = ang_all[:n_disc]
+    resp_val = resp_all[n_disc:]
+    ang_val = ang_all[n_disc:]
 
     # 3. Calculate Signal (Tuning Curves)
     sig_disc, sig_val, bin_centers, avg_resp = _get_signal(resp_disc, ang_disc, resp_val, ang_val, n_bins)
 
-    # 4. Optional Shuffling
-    if shuffle_trials:
-        resp_disc, sig_disc, ang_disc = trials.shuffle(resp_disc, sig_disc, ang_disc, axis=0)
-        resp_val, sig_val, ang_val = trials.shuffle(resp_val, sig_val, ang_val, axis=0)
-
-    # 5. Masking
+    # 4. Masking
     disc_train, disc_test = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
     val_train, val_test = _apply_corner_mask(resp_val, sig_val, ang_val)
 
