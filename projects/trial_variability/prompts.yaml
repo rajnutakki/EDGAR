@@ -2,9 +2,9 @@ model:
   use_image_feedback: true
   base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses to stimuli across trials. Each trial corresponds to a specific stimulus angle. The models are sorted from highest to lowest loss.
 
-    Your task is to create a new model that outperforms all previous models.
+    Your task is to create a new model that outperforms all previous models. Modify the tuning curve, and trial-to-trial variability mechanisms to better fit the data.
 
-    All models have access to the signal (data["signal"], of shape (n_trials, n_cells)), the response for a given cell, averaged over binned stimulus angles, as well as the stimulus angles (data["stimulus"], of shape (n_trials,)). The raw response data["response"] is also available but contains NaNs where data is masked for testing.
+    All models have access to the stimulus angles presented at each trial (data["stimulus"], of shape (n_trials,)).
 
     The loss will be evaluated in a cross-validated setting, so the model should be able to generalize to unseen data.
 
