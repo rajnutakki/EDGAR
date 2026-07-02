@@ -10,7 +10,7 @@ model:
 
     Analyze the progression of models, generalize the improvements, and create a new model that is better than all previous models.
     '
-  explore: 'Use the parent models as inspiration, but be creative and try new structure.
+  explore: 'Use the parent models as inspiration, but be creative and try new ideas, exploring new functional forms.
 
     Identify model features that correlate with lower loss, combine strong ideas, and test novel variants.
 
@@ -76,6 +76,8 @@ parameter_estimator:
     The parameter should be estimated directly, using statistical principles and knowledge of what the parameters represent biologically.
 
     Analyze the progression of the parameter estimators, generalize the improvements, and create a new parameter estimator that is better than all previous estimators.
+
+    Parameter estimators which take too long to run will be rejected, so keep the estimator simple and efficient.
 
     '
   explore: null
