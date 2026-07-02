@@ -2,13 +2,51 @@ import numpy as np
 
 def parameter_estimator(data):
     """
-    Estimates initial parameters for the population Double Split Generalized-Gaussian Model with Affine Shared Variability.
-    Processes each cell independently based on the stimulus angles and responses.
+    Estimates initial parameters for the population skewed asymmetric double gaussian with affine shared variability.
+    First estimates gain, additive offset and coupling via SVD (similar to param_est1),
+    and then estimates tuning curve parameters from the resulting residuals.
     """
-    s = np.asarray(data["stimulus"]) # (n_trials,)
-    r = np.asarray(data["response"]) # (n_trials, n_cells)
+    y = np.asarray(data["response"]) #shape (n_trials, n_cells)
+        
+    theta = np.asarray(data["stimulus"]) #shape (n_trials,)
     
-    n_trials, n_cells = r.shape
+    n_trials, n_cells = y.shape
+
+    # First approximate r_{t,c} as the mean response across trials for each cell.
+    # We use np.nanmean to safely ignore the corner-masked NaNs.
+    r_c = np.nanmean(y, axis=0) # shape (n_cells,)
+    r_c = np.nan_to_num(r_c, nan=0.0)
+    
+    # Best least-squares estimate of a_t h_c is rank-1 SVD of y_{t,c} - \bar{r}_c.
+    # We impute NaNs with 0.0 to prevent standard SVD from propagating NaNs.
+    residual_1 = y - r_c # shape (n_trials, n_cells)
+    residual_1_imputed = np.nan_to_num(residual_1, nan=0.0)
+    
+    U, S, Vt = np.linalg.svd(residual_1_imputed, full_matrices=False)
+    # Use convention of splitting singular value evenly between left and right singular vectors
+    a_t = U[:, 0] * np.sqrt(S[0]) # shape (n_trials,) 
+    h_c = Vt[0, :] * np.sqrt(S[0]) # shape (n_cells,)
+
+    # Now fit g_t with rank-1 SVD.
+    # Again, we impute NaNs with 0.0 before performing the SVD.
+    residual_2 = y - np.outer(a_t, h_c) # shape (n_trials, n_cells)
+    residual_2_imputed = np.nan_to_num(residual_2, nan=0.0)
+    
+    U, S, Vt = np.linalg.svd(residual_2_imputed, full_matrices=False)
+    g_t = U[:, 0] 
+    v_c = Vt[0, :]
+    
+    # To figure out how to parcel out singular value, minimize distance between v_c and r_c
+    b = np.dot(r_c, v_c) / (np.linalg.norm(v_c)**2 + 1e-8)
+    g_t = S[0] * g_t / b # scale g_t by singular value and b to make v_c close to r_c
+    g_t = np.abs(g_t)
+    g_t = np.clip(g_t, 0.01, None)
+
+    # Finally estimate parameters for the tuning curve from residual
+    residual = (y - np.outer(a_t, h_c)) / g_t[:, np.newaxis] # shape (n_trials, n_cells)
+
+    # Use the residual as the tuning response input (handling NaNs as done below)
+    r = residual
     
     # We will compute binned response per cell using 16 bins
     num_bins = 16
@@ -17,7 +55,7 @@ def parameter_estimator(data):
     
     binned_r_list = []
     for i in range(num_bins):
-        mask = (s >= bins[i]) & (s < bins[i+1])
+        mask = (theta >= bins[i]) & (theta < bins[i+1])
         if np.any(mask):
             bin_mean = np.nanmean(r[mask], axis=0) # shape (n_cells,)
         else:
@@ -70,15 +108,10 @@ def parameter_estimator(data):
             amp1[c] = max(0.0, mean_r[c] - baseline[c])
             theta_pref[c] = np.pi
             
-    # Initial gain, offset, and coupling
-    gain = np.ones(n_trials)
-    offset = np.zeros(n_trials)
-    coupling = np.ones(n_cells)
-    
     return {
-        "multiplicative_gain": gain.astype(float),
-        "additive_offset": offset.astype(float),
-        "coupling_factor": coupling.astype(float),
+        "multiplicative_gain": g_t.astype(float),
+        "additive_offset": a_t.astype(float),
+        "coupling_factor": h_c.astype(float),
         "theta_pref": theta_pref.astype(float),
         "baseline": baseline.astype(float),
         "amplitude_1": amp1.astype(float),
@@ -89,4 +122,5 @@ def parameter_estimator(data):
         "tuning_width_2_right": np.full(n_cells, default_w, dtype=float),
         "peak_exponent_1": np.full(n_cells, default_e, dtype=float),
         "peak_exponent_2": np.full(n_cells, default_e, dtype=float),
+        "angle_offset_2": np.zeros(n_cells, dtype=float),
     }
