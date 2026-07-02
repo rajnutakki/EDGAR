@@ -45,14 +45,14 @@ def model(data, params):
 
     return gain[:, np.newaxis] * tuning_curve + np.outer(offset, coupling)
 
-#Each sample of data is shaped (n_trials, n_cells)
+#Each sample of data is shaped (n_trials, n_cells), taken values based on mean of values given by parameter estimator.
 model.DEFAULT_PARAMS = lambda data: {
-    "multiplicative_gain": np.ones(data['response'].shape[-2]),
+    "multiplicative_gain": 0.8*np.ones(data['response'].shape[-2]),
     "additive_offset": np.zeros(data['response'].shape[-2]),
-    "coupling_factor": np.ones(data['response'].shape[-1]),
-    "theta_pref": np.zeros(data['response'].shape[-1]),
-    "baseline": np.zeros(data['response'].shape[-1]),
-    "amplitude_1": np.ones(data['response'].shape[-1]),
-    "amplitude_2": np.zeros(data['response'].shape[-1]),
-    "tuning_width": np.full(data['response'].shape[-1], np.pi / 6),
+    "coupling_factor": -0.03*np.ones(data['response'].shape[-1]),
+    "theta_pref": 3*np.ones(data['response'].shape[-1]),
+    "baseline": 0.0007*np.ones(data['response'].shape[-1]),
+    "amplitude_1": 0.02*np.ones(data['response'].shape[-1]),
+    "amplitude_2": 0.01*np.ones(data['response'].shape[-1]),
+    "tuning_width": np.full(data['response'].shape[-1], 0.4),
 }
