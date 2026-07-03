@@ -75,7 +75,7 @@ def generate_samples(project: str):
 
     programs = [population[i] for i in range(len(population))]
 
-    # 4. Generate Feedback Image (using first 2 as parents)
+    # 4. Generate Feedback Image of seed models
     print("Generating feedback image...")
     def _loss(p: Program) -> float:
             return _safe_loss(p.program_losses.discover.final)
