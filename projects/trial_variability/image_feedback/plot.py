@@ -1,3 +1,4 @@
+from matplotlib import colors
 import matplotlib.pyplot as plt
 import numpy as np
 import jax
@@ -40,6 +41,13 @@ def plot_model_fits(
     title_prefix : str, optional
         Prefix for the figure title.
     """
+    ### Plotting options ####
+    model_colors = ["tab:orange", "tab:blue", "tab:green", "tab:red", "tab:purple", "tab:olive"]
+    model_lw = 1
+    data_color = "black"
+    data_alpha = 0.7
+    data_s = 10
+    
     if save_path == "":
         raise ValueError("plot_model_fits requires a non-empty save_path")
 
@@ -132,7 +140,6 @@ def plot_model_fits(
     # 6. Plotting
     fig = plt.figure(figsize=(18, 36))
     outer_gs = fig.add_gridspec(3, 1, height_ratios=[1.2, 1.2, 1.2], hspace=0.3)
-    colors = ["tab:orange", "tab:blue", "tab:green", "tab:red", "tab:purple", "tab:olive"]
 
     # --- SECTION 1: POPULATION FITS (3x3 grid) ---
     pop_gs = outer_gs[0].subgridspec(3, 3, hspace=0.4, wspace=0.3)
@@ -147,10 +154,10 @@ def plot_model_fits(
         angle = stims[trial_idx]
         
         # Top: Population Response
-        ax1.scatter(sorted_pref_angles, sorted_actual[trial_idx], color="tab:grey", alpha=0.3, s=10, label="Observed")
         for j, y_pred_sorted in enumerate(predictions_sorted):
             label = program_names[j] if j < len(program_names) else f"Model {j+1}"
-            ax1.plot(sorted_pref_angles, y_pred_sorted[trial_idx], color=colors[j % len(colors)], label=label, linewidth=1.5)
+            ax1.plot(sorted_pref_angles, y_pred_sorted[trial_idx], color=model_colors[j % len(model_colors)], label=label, linewidth=model_lw)
+        ax1.scatter(sorted_pref_angles, sorted_actual[trial_idx], color=data_color, alpha=data_alpha, s=data_s, label="Observed", zorder=10)
         
         ax1.axvline(angle % np.pi, color="red", linestyle="--", alpha=0.5, label="Stimulus")
         ax1.set_title(f"Trial {trial_idx} (Angle: {angle:.2f} rad)", fontsize=10)
@@ -161,10 +168,10 @@ def plot_model_fits(
 
         # Bottom: Binned Error
         for j, binned_err in enumerate(binned_mse_losses):
-            ax2.plot(bin_centers, binned_err[:, trial_idx], color=colors[j % len(colors)], linewidth=1.5)
+            ax2.plot(bin_centers, binned_err[:, trial_idx], color=model_colors[j % len(model_colors)], linewidth=model_lw)
         
         ax2.axvline(angle % np.pi, color="red", linestyle="--", alpha=0.5)
-        ax2.set_ylabel("MSE", fontsize=8)
+        ax2.set_ylabel("Binned MSE", fontsize=8)
         ax2.set_xlabel("Pref. Orientation (rad)", fontsize=8)
         ax2.tick_params(labelsize=8)
 
@@ -172,17 +179,21 @@ def plot_model_fits(
     tuning_gs = outer_gs[1].subgridspec(3, 3, hspace=0.35, wspace=0.25)
     for idx, cell in enumerate(chosen_cells):
         row, col = divmod(idx, 3)
-        ax = fig.add_subplot(tuning_gs[row, col])
-        sort_idx = np.argsort(stims)
+        ax_slot = tuning_gs[row, col]
+        inner_gs = ax_slot.subgridspec(2, 1, height_ratios=[4, 1], hspace=0.05)
         
-        # Actual responses
-        ax.scatter(stims, actual_response[:, cell], color='tab:grey', alpha=0.3, s=12, label='Observed')
+        ax1 = fig.add_subplot(inner_gs[0])
+        ax2 = fig.add_subplot(inner_gs[1], sharex=ax1)
+        sort_idx = np.argsort(stims)
         
         # Predictions for each program
         for j, y_pred in enumerate(predictions_raw):
             label = program_names[j] if j < len(program_names) else f"Model {j+1}"
-            ax.plot(stims[sort_idx], y_pred[sort_idx, cell], color=colors[j % len(colors)], linewidth=2.0, label=label)
+            ax1.plot(stims[sort_idx], y_pred[sort_idx, cell], color=model_colors[j % len(model_colors)], linewidth=model_lw, label=label)
             
+        # Actual responses on top
+        ax1.scatter(stims, actual_response[:, cell], color=data_color, alpha=data_alpha, s=data_s, label='Observed', zorder=10)
+        
         # Clip range to fit actual data tightly
         cell_y = actual_response[:, cell]
         valid_y = cell_y[~np.isnan(cell_y)]
@@ -190,20 +201,44 @@ def plot_model_fits(
             ymin, ymax = np.min(valid_y), np.max(valid_y)
             yrange = ymax - ymin if ymax > ymin else 1.0
             padding = 0.10 * yrange
-            ax.set_ylim(ymin - padding, ymax + padding)
+            ax1.set_ylim(ymin - padding, ymax + padding)
             
-        ax.set_title(f"Cell {cell} Tuning Curves", fontsize=10)
-        ax.set_xlabel("Stimulus Angle (rad)", fontsize=8)
-        ax.set_ylabel("Response", fontsize=9)
-        ax.tick_params(labelsize=8)
+        ax1.set_title(f"Cell {cell} Tuning Curves", fontsize=10)
+        ax1.set_ylabel("Response", fontsize=9)
+        ax1.tick_params(labelbottom=False, labelsize=8)
         if idx == 0:
-            ax.legend(fontsize=7, loc="upper right")
+            ax1.legend(fontsize=7, loc="upper right")
+
+        # Bottom: Binned MSE relative to stimulus angle
+        s_bin_edges = np.linspace(np.nanmin(stims), np.nanmax(stims), 20 + 1)
+        s_bin_centers = (s_bin_edges[:-1] + s_bin_edges[1:]) / 2
+        s_bin_indices = np.digitize(stims, s_bin_edges) - 1
+        s_bin_indices = np.clip(s_bin_indices, 0, len(s_bin_edges) - 2)
+
+        for j, y_pred in enumerate(predictions_raw):
+            sq_err = (y_pred[:, cell] - actual_response[:, cell]) ** 2
+            binned_mse = np.zeros(len(s_bin_centers))
+            for b_idx in range(len(s_bin_centers)):
+                mask = (s_bin_indices == b_idx) & (~np.isnan(sq_err))
+                if np.any(mask):
+                    binned_mse[b_idx] = np.nanmean(sq_err[mask])
+                else:
+                    binned_mse[b_idx] = np.nan
+            ax2.plot(s_bin_centers, binned_mse, color=model_colors[j % len(model_colors)], linewidth=model_lw)
+        
+        ax2.set_ylabel("Binned MSE", fontsize=8)
+        ax2.set_xlabel("Stimulus Angle (rad)", fontsize=8)
+        ax2.tick_params(labelsize=8)
 
     # --- SECTION 3: TRIAL-BY-TRIAL TRACKING (3x3 grid) ---
     trial_gs = outer_gs[2].subgridspec(3, 3, hspace=0.35, wspace=0.25)
     for idx, cell in enumerate(chosen_cells):
         row, col = divmod(idx, 3)
-        ax = fig.add_subplot(trial_gs[row, col])
+        ax_slot = trial_gs[row, col]
+        inner_gs = ax_slot.subgridspec(2, 1, height_ratios=[4, 1], hspace=0.05)
+        
+        ax1 = fig.add_subplot(inner_gs[0])
+        ax2 = fig.add_subplot(inner_gs[1], sharex=ax1)
         
         # Pick up to 150 valid (non-NaN) trials for this specific cell to avoid plotting empty masked-out regions
         valid_trial_indices = np.where(~np.isnan(actual_response[:, cell]))[0]
@@ -212,14 +247,14 @@ def plot_model_fits(
         else:
             trials_idx = np.arange(min(150, len(stims)))
             
-        # Actual responses
-        ax.plot(trials_idx, actual_response[trials_idx, cell], color='gray', alpha=0.4, marker='o', markersize=3, linestyle='-', label='Actual')
-        
         # Predictions
         for j, y_pred in enumerate(predictions_raw):
             label = program_names[j] if j < len(program_names) else f"Model {j+1}"
-            ax.plot(trials_idx, y_pred[trials_idx, cell], color=colors[j % len(colors)], linestyle='--', linewidth=1.5, label=label)
+            ax1.plot(trials_idx, y_pred[trials_idx, cell], color=model_colors[j % len(model_colors)], linestyle='--', linewidth=model_lw, label=label)
             
+        # Actual responses on top
+        ax1.plot(trials_idx, actual_response[trials_idx, cell], marker='o', color=data_color, alpha=data_alpha, markersize=data_s-6, label='Actual', zorder=10)
+        
         # Clip range to fit actual data tightly
         cell_y = actual_response[trials_idx, cell]
         valid_y = cell_y[~np.isnan(cell_y)]
@@ -227,14 +262,22 @@ def plot_model_fits(
             ymin, ymax = np.min(valid_y), np.max(valid_y)
             yrange = ymax - ymin if ymax > ymin else 1.0
             padding = 0.10 * yrange
-            ax.set_ylim(ymin - padding, ymax + padding)
+            ax1.set_ylim(ymin - padding, ymax + padding)
             
-        ax.set_title(f"Cell {cell} Trial Response", fontsize=10)
-        ax.set_xlabel("Trial", fontsize=8)
-        ax.set_ylabel("Response", fontsize=8)
-        ax.tick_params(labelsize=8)
+        ax1.set_title(f"Cell {cell} Trial Response", fontsize=10)
+        ax1.set_ylabel("Response", fontsize=8)
+        ax1.tick_params(labelbottom=False, labelsize=8)
         if idx == 0:
-            ax.legend(fontsize=8)
+            ax1.legend(fontsize=8)
+
+        # Bottom: Point by point MSE
+        for j, y_pred in enumerate(predictions_raw):
+            sq_err = (y_pred[trials_idx, cell] - actual_response[trials_idx, cell]) ** 2
+            ax2.plot(trials_idx, sq_err, color=model_colors[j % len(model_colors)], linewidth=model_lw)
+            
+        ax2.set_ylabel("MSE", fontsize=8)
+        ax2.set_xlabel("Trial", fontsize=8)
+        ax2.tick_params(labelsize=8)
 
     # Construct Title
     summary_parts = []

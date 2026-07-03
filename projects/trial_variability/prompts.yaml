@@ -1,6 +1,6 @@
 model:
   use_image_feedback: true
-  base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses to stimuli across trials. Each trial corresponds to a specific stimulus angle. The models are sorted from highest to lowest loss.
+  base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses to stimuli across trials. Each trial corresponds to a specific stimulus angle. The models are sorted from highest to lowest loss, where lower loss is better.
 
     Your task is to create a new model that outperforms all previous models. Modify the tuning curve, and trial-to-trial variability mechanisms to better fit the data.
 
@@ -51,11 +51,16 @@ model:
 
     '
   image_analysis_instructions: '**Image Analysis Instructions:**\n 
-    Analyze the provided plot showing model fits for 9 random trials.
-    The top panels show the population response (grey dots) and model predictions (orange for worst average fit, blue for best average fit).
-    The bottom panels show the Binned Mean Squared Error (MSE) across the population.
-    Look for specific orientations where the error is high and consider how to adjust the gain or offset mechanisms to better capture these fluctuations, and consider how to capture trial-to-trial fluctuations.
+    Analyze the provided plots comparing model fits with the actual neural responses.
+    In all plots, in the top panel, the actual responses (black dots) are shown on top of model predictions (colored lines, orange for worst average fit, blue for next best, green for best). 
+    The bottom panels show the corresponding Mean Squared Error (MSE), which is sometimes binned, between the actual data and the corresponding models.
 
+    The plots are organized as follows:
+    Top: Responses from specific trials, with cells on the x-axis sorted by their preferred orientation.
+    Middle: Responses from specific cells, with trials on the x-axis sorted by stimulus angle.
+    Bottom: Responses from specific cells, with arbitrary trial order on the x-axis.
+
+    Analyze where the models fail to capture the actual responses, and identify patterns in the errors. For example, does the model consistently under/over predict trials with large/small responses? Use this information to inform your model design, considering how the model can be improved to overcome identified shortcomings.
     '
 
   parent_program_template: '**Model: {name}**
