@@ -172,6 +172,7 @@ def plot_model_fits(
         
         ax2.axvline(angle % np.pi, color="red", linestyle="--", alpha=0.5)
         ax2.set_ylabel("Binned MSE", fontsize=8)
+        ax2.set_yscale('log')
         ax2.set_xlabel("Pref. Orientation (rad)", fontsize=8)
         ax2.tick_params(labelsize=8)
 
@@ -227,6 +228,7 @@ def plot_model_fits(
             ax2.plot(s_bin_centers, binned_mse, color=model_colors[j % len(model_colors)], linewidth=model_lw)
         
         ax2.set_ylabel("Binned MSE", fontsize=8)
+        ax2.set_yscale('log')
         ax2.set_xlabel("Stimulus Angle (rad)", fontsize=8)
         ax2.tick_params(labelsize=8)
 
