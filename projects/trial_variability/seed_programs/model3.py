@@ -29,6 +29,8 @@ def model(data, params):
     coupling = params["coupling_factor"]
 
     # Clip parameters to biologically plausible/numerically stable ranges
+    offset = np.clip(offset, 0, None)
+    coupling = np.clip(coupling, 0, None)
     theta_pref = np.clip(params["theta_pref"], 0, 2 * np.pi)
     baseline = np.clip(params["baseline"], 0, None)
     amplitude_1 = np.clip(params["amplitude_1"], 0, None)
