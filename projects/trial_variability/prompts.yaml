@@ -2,7 +2,7 @@ model:
   use_image_feedback: true
   base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses to stimuli across trials. Each trial corresponds to a specific stimulus angle. The models are sorted from highest to lowest loss, where lower loss is better.
 
-    Your task is to create a new model that outperforms all previous models. Modify the tuning curve, and trial-to-trial variability mechanisms to better fit the data.
+    Your task is to create a new model that outperforms all previous models. Modify the tuning curve and trial-to-trial variability mechanisms to better fit the data.
 
     All models have access to the stimulus angles presented at each trial (data["stimulus"], of shape (n_trials,)).
 
@@ -11,9 +11,8 @@ model:
     Analyze the progression of models, generalize the improvements, and create a new model that is better than all previous models.
     '
   explore: 'Use the parent models as inspiration, but be creative and try new ideas, exploring new functional forms.
-
-    Identify model features that correlate with lower loss, combine strong ideas, and test novel variants.
-
+  
+  
     '
   exploit: 'Use the parent models as a template to produce a stronger model.
 
