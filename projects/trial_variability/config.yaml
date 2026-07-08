@@ -5,10 +5,13 @@ io:
   save_path: "/home/rajah/projects/trial_variability/run_output"
 
 evolution:
-  n_generations: 12
+  #n_generations: 12
+  n_generations: 6
   batch_size: 6
-  n_islands: 8
-  topology: [1, 2, 3, 4, 5, 6, 7, 0]
+  #n_islands: 8
+  n_islands: 4
+  #topology: [1, 2, 3, 4, 5, 6, 7, 0]
+  topology: [1, 2, 3, 0]
   critical_population_size: 12
   n_migrants: 2
 
@@ -19,7 +22,7 @@ llms:
   swear_words: []
 
 scoring:
-  param_penalty_weight: 0.0
+  param_penalty_weight: 5e-5
 
 project_params:
   activity_thresh: 0.4
