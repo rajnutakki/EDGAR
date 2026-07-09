@@ -3,8 +3,7 @@ import numpy as np
 def parameter_estimator(data):
     """
     Estimates initial parameters for the population skewed asymmetric double gaussian with affine shared variability.
-    First estimates gain, additive offset and coupling via SVD (similar to param_est1),
-    and then estimates tuning curve parameters from the resulting residuals.
+    First estimates gain, additive offset and coupling via SVD, and then estimates tuning curve parameters from the resulting residuals.
     """
     y = np.asarray(data["response"]) #shape (n_trials, n_cells)
         

@@ -3,27 +3,10 @@ import numpy as np
 def parameter_estimator(data):
     """
     Estimates initial parameters for the population Double Gaussian Model with trial-wise exponent.
-    Assumes initial trial_exponent = 1.0, simplifying the model to f(t,c) = r_{t,c} + a_t h_c.
+    Assumes initial trial_exponent = 1.0, simplifying the model to f(t,c) = r_{t,c}.
     """
     y = np.asarray(data["response"]) #shape (n_trials, n_cells)
     theta = np.asarray(data["stimulus"]) #shape (n_trials,)
-
-    # First approximate r_{t,c} as the mean response across trials for each cell.
-    r_c = np.nanmean(y, axis=0) # shape (n_cells,)
-    r_c = np.nan_to_num(r_c, nan=0.0)
-    
-    # Best least-squares estimate of a_t h_c is rank-1 SVD of y_{t,c} - \bar{r}_c.
-    # We impute NaNs with 0.0 to prevent standard SVD from propagating NaNs.
-    residual_1 = y - r_c # shape (n_trials, n_cells)
-    residual_1_imputed = np.nan_to_num(residual_1, nan=0.0)
-    
-    U, S, Vt = np.linalg.svd(residual_1_imputed, full_matrices=False)
-    # Use convention of splitting singular value evenly between left and right singular vectors
-    a_t = U[:, 0] * np.sqrt(S[0]) # shape (n_trials,) 
-    h_c = Vt[0, :] * np.sqrt(S[0]) # shape (n_cells,)
-
-    # Under assumption that trial_exponent = 1.0, estimate parameters for the tuning curve from residual
-    residual = y - np.outer(a_t, h_c) # shape (n_trials, n_cells)
     
     # NaN-aware vectorized double-peaked Gaussian tuning curve parameter estimation
     n_bins = 50
@@ -34,8 +17,8 @@ def parameter_estimator(data):
     sums = np.zeros((n_bins, n_cells))
     counts = np.zeros((n_bins, n_cells))
     
-    valid_mask = ~np.isnan(residual)
-    np.add.at(sums, bin_idx, np.nan_to_num(residual, nan=0.0))
+    valid_mask = ~np.isnan(y)
+    np.add.at(sums, bin_idx, np.nan_to_num(y, nan=0.0))
     np.add.at(counts, bin_idx, valid_mask.astype(float))
 
     sig = 2
@@ -75,8 +58,6 @@ def parameter_estimator(data):
     
     return {
         "trial_exponent": np.ones(y.shape[-2], dtype=float),
-        "additive_offset": a_t.astype(float),
-        "coupling_factor": h_c.astype(float),
         "theta_pref": theta_pref.astype(float),
         "baseline": baseline.astype(float),
         "amplitude_1": amplitude_1.astype(float),
