@@ -502,3 +502,62 @@ async def test_translate_one_model_with_real_llm():
     assert "jnp" in program.code.model_jax
     assert program.code.model == model_code
     assert load_function_from_source(program.code.model_jax, "model") is not None
+
+
+def test_naive_numpy_to_jax_translation():
+    from edgar.llm.generate import naive_numpy_to_jax_translation
+
+    # Case 1: normal numpy import replacement
+    code_with_import = (
+        "import numpy as np\ndef model(data, params):\n    return np.mean(data)"
+    )
+    result = naive_numpy_to_jax_translation(code_with_import)
+    assert "import jax.numpy as jnp" in result
+    assert "jnp.mean" in result
+    assert "np." not in result.replace("jnp.", "")
+
+    # Case 2: plain numpy import replacement
+    code_plain_import = (
+        "import numpy\ndef model(data, params):\n    return np.mean(data)"
+    )
+    result2 = naive_numpy_to_jax_translation(code_plain_import)
+    assert "import jax.numpy as jnp" in result2
+    assert "jnp.mean" in result2
+
+    # Case 3: JAX import added if missing
+    code_no_import = "def model(data, params):\n    return np.mean(data)"
+    result3 = naive_numpy_to_jax_translation(code_no_import)
+    assert "import jax.numpy as jnp" in result3
+    assert result3.startswith("import jax.numpy as jnp\n")
+
+
+def test_check_jax_code_compiles():
+    from edgar.llm.generate import check_jax_code_compiles
+
+    # Case 1: valid JAX code
+    valid_code = (
+        "import jax.numpy as jnp\ndef model(data, params):\n    return jnp.sum(data)"
+    )
+    assert check_jax_code_compiles(valid_code) == "SUCCESS"
+
+    # Case 2: syntax error
+    invalid_syntax = "def model(data, params):\n    return jnp.sum(data"
+    assert "Syntax Error" in check_jax_code_compiles(invalid_syntax)
+
+    # Case 3: execution error
+    exec_error_code = "import jax.numpy as jnp\nx = undefined_name_error\ndef model(data, params):\n    return jnp.sum(data)"
+    assert "Execution Error" in check_jax_code_compiles(exec_error_code)
+
+    # Case 4: validation error - missing model function
+    missing_model = "import jax.numpy as jnp\ndef other_func(data, params):\n    return jnp.sum(data)"
+    assert (
+        check_jax_code_compiles(missing_model)
+        == "Validation Error: 'model' function is not defined."
+    )
+
+    # Case 5: validation error - model is not callable
+    non_callable_model = "import jax.numpy as jnp\nmodel = 42"
+    assert (
+        check_jax_code_compiles(non_callable_model)
+        == "Validation Error: 'model' is defined but is not callable."
+    )

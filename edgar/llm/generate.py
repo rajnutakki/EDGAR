@@ -18,6 +18,7 @@ from typing import Any, TYPE_CHECKING, Callable
 import numpy as np
 
 from pydantic_ai.models import Model
+from pydantic_ai import UsageLimits
 from pydantic import BaseModel
 
 from ..evolution.program import Program
@@ -346,6 +347,58 @@ async def generate_param_ests(
 # ---------------------------------------------------------------------------
 # JAX translation
 # ---------------------------------------------------------------------------
+def naive_numpy_to_jax_translation(code: str) -> str:
+    """Performs naive replacements of numpy imports and references with JAX equivalents.
+
+    Args:
+        code: The numpy python code string to translate.
+
+    Returns:
+        The translated python code string using JAX.
+    """
+    translated = code
+    if "import numpy as np" in translated:
+        translated = translated.replace("import numpy as np", "import jax.numpy as jnp")
+    elif "import numpy" in translated:
+        translated = translated.replace("import numpy", "import jax.numpy as jnp")
+
+    translated = translated.replace("np.", "jnp.")
+
+    if "import jax.numpy as jnp" not in translated and "jax.numpy" not in translated:
+        translated = "import jax.numpy as jnp\n" + translated
+
+    return translated
+
+
+def check_jax_code_compiles(code: str) -> str:
+    """Performs a syntax and execution safety check on JAX code.
+
+    Args:
+        code: The JAX python code string to check.
+
+    Returns:
+        "SUCCESS" if the code is valid and compiles, otherwise a string detailing the compilation or validation error.
+    """
+    try:
+        compile(code, "<string>", "exec")
+    except Exception as e:
+        return f"Syntax Error: {e}"
+
+    namespace = {}
+    try:
+        exec(code, namespace)
+    except Exception as e:
+        return f"Execution Error: {e}"
+
+    if "model" not in namespace:
+        return "Validation Error: 'model' function is not defined."
+
+    if not callable(namespace["model"]):
+        return "Validation Error: 'model' is defined but is not callable."
+
+    return "SUCCESS"
+
+
 async def _translate_one_model(
     program: Program,
     model_prompt_schema: PromptSchema,
@@ -373,6 +426,8 @@ async def _translate_one_model(
         None. The `program` object is mutated in-place if translation is successful.
     """
     model_prompt = model_prompt_schema.build_prompt("explore", current_program=program)
+    tools = [naive_numpy_to_jax_translation, check_jax_code_compiles]
+    usage_limits = UsageLimits(request_limit=5)
     model_result = await call_llm(
         prompt=model_prompt,
         llm_model=llm,
@@ -381,6 +436,8 @@ async def _translate_one_model(
         retry_config=retry_config,
         max_tokens=max_tokens,
         role="jax",
+        tools=tools,
+        usage_limits=usage_limits,
     )
     # Validate the generated JAX code by attempting to load the function from its source.
     # Only assign if the LLM returned a result and the code is valid.

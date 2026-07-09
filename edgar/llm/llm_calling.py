@@ -13,10 +13,10 @@ import os
 import random
 import time
 import warnings
-from typing import Union, TypeAlias
+from typing import Callable, Union, TypeAlias
 
 from dotenv import load_dotenv
-from pydantic_ai import Agent, BinaryContent
+from pydantic_ai import Agent, BinaryContent, UsageLimits
 from pydantic_ai.capabilities.abstract import AbstractCapability
 from pydantic_ai.exceptions import (
     ModelHTTPError,
@@ -217,6 +217,8 @@ async def call_llm(
     log_raw_llm_response: bool = False,
     retry_config: RetryConfig | None = None,
     role: str | None = None,
+    tools: list[Callable] | None = None,
+    usage_limits: UsageLimits | None = None,
 ) -> LLMOutputTypes | None:
     """Calls an LLM through PydanticAI, handling provider-specific settings, retries, and structured output.
 
@@ -249,6 +251,8 @@ async def call_llm(
         retry_config: An optional `RetryConfig` object specifying the retry
             strategy for transient HTTP errors. If `None`, a default configuration is used.
         role: Optional role name for the LLM call.
+        tools: Optional list of callables that the agent can use as tools.
+        usage_limits: Optional UsageLimits to restrict request/token count.
 
     Returns:
         The model's output, either as a string, an instance of the specified `output_type`,
@@ -298,11 +302,23 @@ async def call_llm(
     capabilities = [_WarnOnMaxTokensCapability(), recorder]
     if log_raw_llm_response:
         capabilities.append(_LogRawResponseCapability())
+
+    agent_kwargs = {}
+    if tools:
+        # Avoid registering tools for test/mock models to prevent disrupting the request-response sequence
+        is_test_model = (
+            model.__class__.__name__ in ("CyclingModel", "TestModel")
+            or getattr(model, "system", None) == "test"
+        )
+        if not is_test_model:
+            agent_kwargs["tools"] = tools
+
     agent = Agent(
         model,
         output_type=output_type,
         retries={"output": rc.max_retries},
         capabilities=capabilities,
+        **agent_kwargs,
     )
 
     user_input = (
@@ -328,7 +344,9 @@ async def call_llm(
         for attempt in range(rc.max_retries):
             attempt_count = attempt + 1
             try:
-                result = await agent.run(user_input, model_settings=model_settings)
+                result = await agent.run(
+                    user_input, model_settings=model_settings, usage_limits=usage_limits
+                )
                 ok = True
                 return result.output
 
@@ -337,6 +355,12 @@ async def call_llm(
                 warnings.warn(
                     f"[call_llm] LLM output could not be parsed as {type_name!r} after exhausting retries — skipping. "
                     f"{e.message}"
+                )
+                return None
+
+            except UsageLimitExceeded as e:
+                warnings.warn(
+                    f"[call_llm] Usage limit exceeded during agent run: {e}. Returning None."
                 )
                 return None
 
@@ -360,8 +384,8 @@ async def call_llm(
                 await asyncio.sleep(wait)
                 delay = min(delay * rc.backoff_multiplier, rc.max_delay)
 
-            # ModelAPIError (non-HTTP network failure), UsageLimitExceeded, UserError → propagate immediately
-            except (ModelAPIError, UsageLimitExceeded, UserError) as e:
+            # ModelAPIError (non-HTTP network failure), UserError → propagate immediately
+            except (ModelAPIError, UserError) as e:
                 warnings.warn(f"[call_llm] {type(e).__name__} encountered: {e}")
                 raise
     finally:
