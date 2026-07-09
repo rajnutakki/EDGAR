@@ -116,7 +116,7 @@ parameter_estimator:
   - code.model
 jax_translator_model:
   base: '
-    Translate the following model function to JAX-compatible code.
+    Translate the following model function to JAX-compatible code, verifying that the code will compile.
 
     Ensure that keys of data and params dicts are preserved. 
     
