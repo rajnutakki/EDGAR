@@ -5,15 +5,13 @@ def model(data, params):
     Model with a trial-varying non-linear exponent instead of multiplicative gain.
     Double peaked Gaussian tuning curve per cell raised to a trial-by-trial exponent.
 
-    Equation : f(t,c) = r(theta(t), c) ^ trial_exponent(t) + additive_offset(t) * coupling_factor(c) 
+    Equation : f(t,c) = r(theta(t), c) ^ trial_exponent(t)
     where r(theta(t), c) is the double-peaked gaussian tuning curve.
 
     data['stimulus'] = theta  # stimulus angle (radians), shape (n_trials,)
 
     params:
         trial_exponent: shape (n_trials,)
-        additive_offset: shape (n_trials,)
-        coupling_factor: shape (n_cells,)
         theta_pref: Preferred direction for the primary peak, shape (n_cells,)
         baseline: Baseline firing rate, shape (n_cells,)
         amplitude_1: Amplitude of the first peak, shape (n_cells,)
@@ -25,12 +23,8 @@ def model(data, params):
     """
     theta = data['stimulus']
     exponent = params["trial_exponent"]
-    offset = params["additive_offset"]
-    coupling = params["coupling_factor"]
 
     # Clip parameters to biologically plausible/numerically stable ranges
-    offset = np.clip(offset, 0, None)
-    coupling = np.clip(coupling, 0, None)
     theta_pref = np.clip(params["theta_pref"], 0, 2 * np.pi)
     baseline = np.clip(params["baseline"], 0, None)
     amplitude_1 = np.clip(params["amplitude_1"], 0, None)
@@ -53,13 +47,11 @@ def model(data, params):
     # Protect against 0^trial_exponent gradient singularities
     tuning_curve = np.clip(tuning_curve, 1e-6, None)
 
-    return tuning_curve ** trial_exponent[:, np.newaxis] + np.outer(offset, coupling)
+    return tuning_curve ** trial_exponent[:, np.newaxis]
 
 # Each sample of data is shaped (n_trials, n_cells)
 model.DEFAULT_PARAMS = lambda data: {
     "trial_exponent": np.ones(data['response'].shape[-2]),
-    "additive_offset": np.zeros(data['response'].shape[-2]),
-    "coupling_factor": -0.03*np.ones(data['response'].shape[-1]),
     "theta_pref": 3*np.ones(data['response'].shape[-1]),
     "baseline": 0.0007*np.ones(data['response'].shape[-1]),
     "amplitude_1": 0.02*np.ones(data['response'].shape[-1]),
