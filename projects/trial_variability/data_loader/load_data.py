@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import tarfile
+import tempfile
+from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
@@ -110,71 +113,85 @@ def load_data(
 
     Returns data in (n_samples, n_trials, n_cells) shape, where n_samples=1 for population modeling.
     """
-    # 1. Load and Filter
-    data_paths = (
-        (
-            data_path+"/BZ015_2025-07-03_2/BZ015_2025-07-03_2_dspikes.npy",
-            data_path+"/BZ015_2025-07-03_2/2025-07-03_2_BZ015_Block.mat",
-        ),
-        (
-            data_path+"/BZ015_2025-07-03_3/BZ015_2025-07-03_3_dspikes.npy",
-            data_path+"/BZ015_2025-07-03_3/2025-07-03_3_BZ015_Block.mat",
-        ),
-        (
-            data_path+"/BZ015_2025-07-03_5/BZ015_2025-07-03_5_dspikes.npy",
-            data_path+"/BZ015_2025-07-03_5/2025-07-03_5_BZ015_Block.mat",
-        ),
-    )
-    responses_raw, angles_raw = _load_raw_data(data_paths)
-    responses_filtered = _filter_cells(responses_raw, angles_raw, activity_thresh, conc_thresh)
+    # If a tarball is provided, extract it to a temporary directory
+    _temp_dir = None
+    if data_path.endswith(".tar.gz") or data_path.endswith(".tgz"):
+        _temp_dir = tempfile.TemporaryDirectory()
+        print(f"Extracting dataset archive {data_path} to {_temp_dir.name}...")
+        with tarfile.open(data_path, "r:gz") as tar:
+            tar.extractall(path=_temp_dir.name)
+        # BZ015 folder will be directly under the temporary directory
+        data_path = str(Path(_temp_dir.name) / "BZ015")
 
-    # 2. Normalize, (optionally shuffle), partition
-    resp_all = np.vstack(responses_filtered)
-    ang_all = np.concatenate(angles_raw)
-    resp_all = normalization.by_vector_norm(resp_all, axis=0)
-
-    if shuffle_trials:
-        # Shuffle trials globally across all repeats before partitioning
-        rng = np.random.default_rng(random_seed)
-        shuffled_idx = rng.permutation(len(resp_all))
-        resp_all = resp_all[shuffled_idx]
-        ang_all = ang_all[shuffled_idx]
-
-    # Partition back into discovery and validation using 2/3 and 1/3 of the trials respectively
-    n_disc = sum(r.shape[0] for r in responses_filtered[:2])
-    resp_disc = resp_all[:n_disc]
-    ang_disc = ang_all[:n_disc]
-    resp_val = resp_all[n_disc:]
-    ang_val = ang_all[n_disc:]
-
-    # 3. Calculate Signal (Tuning Curves)
-    sig_disc, sig_val, bin_centers, avg_resp = _get_signal(resp_disc, ang_disc, resp_val, ang_val, n_bins)
-
-    # 4. Masking
-    disc_train, disc_test = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
-    val_train, val_test = _apply_corner_mask(resp_val, sig_val, ang_val)
-
-
-    # 6. Add Sample Dimension to ALL fields
-    for d in [disc_train, disc_test, val_train, val_test]:
-        for k in d:
-            if isinstance(d[k], np.ndarray):
-                d[k] = d[k][np.newaxis, ...]
-    
-    # 7. Fingerprinting (Evaluation Set)
-    eval_data = {**disc_train, "_sample_indices": np.array([0])}
-
-    if show_plots:
-        _plot_partitions(disc_train, disc_test, val_train, val_test)
-        _plot_tuning_verification(
-            np.vstack([resp_disc, resp_val]), np.concatenate([ang_disc, ang_val]), bin_centers, avg_resp, random_seed
+    try:
+        # 1. Load and Filter
+        data_paths = (
+            (
+                data_path+"/BZ015_2025-07-03_2/BZ015_2025-07-03_2_dspikes.npy",
+                data_path+"/BZ015_2025-07-03_2/2025-07-03_2_BZ015_Block.mat",
+            ),
+            (
+                data_path+"/BZ015_2025-07-03_3/BZ015_2025-07-03_3_dspikes.npy",
+                data_path+"/BZ015_2025-07-03_3/2025-07-03_3_BZ015_Block.mat",
+            ),
+            (
+                data_path+"/BZ015_2025-07-03_5/BZ015_2025-07-03_5_dspikes.npy",
+                data_path+"/BZ015_2025-07-03_5/2025-07-03_5_BZ015_Block.mat",
+            ),
         )
+        responses_raw, angles_raw = _load_raw_data(data_paths)
+        responses_filtered = _filter_cells(responses_raw, angles_raw, activity_thresh, conc_thresh)
 
-    return (
-        (_to_jax(disc_train), _to_jax(disc_test)),
-        (_to_jax(val_train), _to_jax(val_test)),
-        _to_jax(eval_data),
-    )
+        # 2. Normalize, (optionally shuffle), partition
+        resp_all = np.vstack(responses_filtered)
+        ang_all = np.concatenate(angles_raw)
+        resp_all = normalization.by_vector_norm(resp_all, axis=0)
+
+        if shuffle_trials:
+            # Shuffle trials globally across all repeats before partitioning
+            rng = np.random.default_rng(random_seed)
+            shuffled_idx = rng.permutation(len(resp_all))
+            resp_all = resp_all[shuffled_idx]
+            ang_all = ang_all[shuffled_idx]
+
+        # Partition back into discovery and validation using 2/3 and 1/3 of the trials respectively
+        n_disc = sum(r.shape[0] for r in responses_filtered[:2])
+        resp_disc = resp_all[:n_disc]
+        ang_disc = ang_all[:n_disc]
+        resp_val = resp_all[n_disc:]
+        ang_val = ang_all[n_disc:]
+
+        # 3. Calculate Signal (Tuning Curves)
+        sig_disc, sig_val, bin_centers, avg_resp = _get_signal(resp_disc, ang_disc, resp_val, ang_val, n_bins)
+
+        # 4. Masking
+        disc_train, disc_test = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
+        val_train, val_test = _apply_corner_mask(resp_val, sig_val, ang_val)
+
+
+        # 6. Add Sample Dimension to ALL fields
+        for d in [disc_train, disc_test, val_train, val_test]:
+            for k in d:
+                if isinstance(d[k], np.ndarray):
+                    d[k] = d[k][np.newaxis, ...]
+        
+        # 7. Fingerprinting (Evaluation Set)
+        eval_data = {**disc_train, "_sample_indices": np.array([0])}
+
+        if show_plots:
+            _plot_partitions(disc_train, disc_test, val_train, val_test)
+            _plot_tuning_verification(
+                np.vstack([resp_disc, resp_val]), np.concatenate([ang_disc, ang_val]), bin_centers, avg_resp, random_seed
+            )
+
+        return (
+            (_to_jax(disc_train), _to_jax(disc_test)),
+            (_to_jax(val_train), _to_jax(val_test)),
+            _to_jax(eval_data),
+        )
+    finally:
+        if _temp_dir is not None:
+            _temp_dir.cleanup()
 
 
 def _plot_partitions(disc_train, disc_test, val_train, val_test):
