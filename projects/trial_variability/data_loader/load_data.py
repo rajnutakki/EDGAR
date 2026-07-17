@@ -53,26 +53,21 @@ def _filter_cells(
 
 
 def _get_signal(
-    resp_disc: np.ndarray, ang_disc: np.ndarray, resp_val: np.ndarray, ang_val: np.ndarray, n_bins: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Calculate the binned mean signal (tuning curves) for discovery and validation sets."""
-    all_resp = np.vstack([resp_disc, resp_val])
-    all_ang = np.concatenate([ang_disc, ang_val])
-
+    resp: np.ndarray, ang: np.ndarray, n_bins: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Calculate the binned mean signal (tuning curves) using only train trials to prevent data leakage."""
     bin_edges = np.linspace(0, 2 * np.pi, n_bins + 1)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    # Global tuning curves
-    averaged_response = signal.binned_mean(all_ang, all_resp.T, bin_centers)
+    # Fit binned tuning curves using ONLY the first-half training trials
+    trial_mid = len(resp) // 2
+    avg_resp = signal.binned_mean(ang[:trial_mid], resp[:trial_mid].T, bin_centers)
 
-    # Map global tuning curves back to individual trials
-    _, bin_indices_disc = signal.binned_mean(ang_disc, resp_disc.T, bin_centers, return_indices=True)
-    signal_disc = averaged_response[:, bin_indices_disc].T
+    # Map these train-only tuning curves back to ALL trials of this partition
+    _, bin_indices = signal.binned_mean(ang, resp.T, bin_centers, return_indices=True)
+    sig_all = avg_resp[:, bin_indices].T
 
-    _, bin_indices_val = signal.binned_mean(ang_val, resp_val.T, bin_centers, return_indices=True)
-    signal_val = averaged_response[:, bin_indices_val].T
-
-    return signal_disc, signal_val, bin_centers, averaged_response
+    return sig_all, bin_centers, avg_resp
 
 
 def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray) -> tuple[dict, dict]:
@@ -162,7 +157,8 @@ def load_data(
         ang_val = ang_all[n_disc:]
 
         # 3. Calculate Signal (Tuning Curves)
-        sig_disc, sig_val, bin_centers, avg_resp = _get_signal(resp_disc, ang_disc, resp_val, ang_val, n_bins)
+        sig_disc, bin_centers, avg_resp_disc = _get_signal(resp_disc, ang_disc, n_bins)
+        sig_val, _, avg_resp_val = _get_signal(resp_val, ang_val, n_bins)
 
         # 4. Masking
         disc_train, disc_test = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
@@ -181,7 +177,7 @@ def load_data(
         if show_plots:
             _plot_partitions(disc_train, disc_test, val_train, val_test)
             _plot_tuning_verification(
-                np.vstack([resp_disc, resp_val]), np.concatenate([ang_disc, ang_val]), bin_centers, avg_resp, random_seed
+                np.vstack([resp_disc, resp_val]), np.concatenate([ang_disc, ang_val]), bin_centers, avg_resp_disc, random_seed
             )
 
         return (
