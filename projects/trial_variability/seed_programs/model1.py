@@ -2,9 +2,9 @@ import numpy as np
 
 def model(data, params):
     """
-    Affine model for trial-to-trial variability with double gaussian tuning curve per cell.
+    Affine shared variability model, consisting of gain modulation + additive offset, with a skewed asymmetric double gaussian tuning curve per cell.
 
-    Equation : f(t,c) = multiplicative_gain(t) * r(theta(t), c) + additive_offset(t) * coupling_factor(c) where r(theta(t), c) is the double-peaked gaussian tuning curve.
+    Equation : f(t,c) = multiplicative_gain(t) * r(theta(t), c) + additive_offset(t) * coupling_factor(c) where r(theta(t), c) is the skewed asymmetric double-peaked gaussian tuning curve.
 
     data['stimulus'] = theta  # stimulus angle (radians), shape (n_trials,)
 
@@ -12,11 +12,16 @@ def model(data, params):
         multiplicative_gain: shape (n_trials,)
         additive_offset: shape (n_trials,)
         coupling_factor: shape (n_cells,)
-        theta_pref: Preferred direction for the primary peak, shape (n_cells,)
         baseline: Baseline firing rate, shape (n_cells,)
         amplitude_1: Amplitude of the first peak, shape (n_cells,)
         amplitude_2: Amplitude of the second peak, shape (n_cells,)
-        tuning_width: Width of both peaks, shape (n_cells,)
+        tuning_width_1_left: Width of the left side of the first peak, shape (n_cells,)
+        tuning_width_1_right: Width of the right side of the first peak, shape (n_cells,)
+        tuning_width_2_left: Width of the left side of the second peak, shape (n_cells,)
+        tuning_width_2_right: Width of the right side of the second peak, shape (n_cells,)
+        peak_exponent_1: Exponent for the generalized Gaussian shape of the first peak, shape (n_cells,)
+        peak_exponent_2: Exponent for the generalized Gaussian shape of the second peak, shape (n_cells,)
+        angle_offset_2: Offset for the second peak relative to the first peak, shape (n_cells,)
 
     Returns:
         np.ndarray: Predicted response, shape (n_trials, n_cells).
@@ -34,28 +39,52 @@ def model(data, params):
     baseline = np.clip(params["baseline"], 0, None)
     amplitude_1 = np.clip(params["amplitude_1"], 0, None)
     amplitude_2 = np.clip(params["amplitude_2"], 0, None)
-    tuning_width = np.clip(params["tuning_width"], 0.01, None)
+    tuning_width_1_left = np.clip(params["tuning_width_1_left"], 0.01, None)
+    tuning_width_1_right = np.clip(params["tuning_width_1_right"], 0.01, None)
+    tuning_width_2_left = np.clip(params["tuning_width_2_left"], 0.01, None)
+    tuning_width_2_right = np.clip(params["tuning_width_2_right"], 0.01, None)
+    peak_exponent_1 = np.clip(params["peak_exponent_1"], 0.1, 10.0)
+    peak_exponent_2 = np.clip(params["peak_exponent_2"], 0.1, 10.0)
+    angle_offset_2 = np.clip(params["angle_offset_2"], -np.pi, np.pi)
 
-    # circular distance
-    def circ_dist(angle1, angle2):
-        return np.abs(np.arctan2(np.sin(angle1 - angle2), np.cos(angle1 - angle2)))
+    # Signed circular distance
+    def signed_circ_dist(angle1, angle2):
+        return np.arctan2(np.sin(angle1 - angle2), np.cos(angle1 - angle2))
 
-    dist_1 = circ_dist(theta[:, np.newaxis], theta_pref)
-    dist_2 = circ_dist(theta[:, np.newaxis], (theta_pref + np.pi) % (2 * np.pi))
-    peak1 = amplitude_1 * np.exp(-0.5 * (dist_1 / tuning_width) ** 2)
-    peak2 = amplitude_2 * np.exp(-0.5 * (dist_2 / tuning_width) ** 2)
-    tuning_curve = baseline + peak1 + peak2
+    # Calculate for the first peak
+    # Broadcast theta (n_trials, 1) against theta_pref (n_cells,)
+    dist_1_signed = signed_circ_dist(theta[:, np.newaxis], theta_pref)
+    abs_dist_1 = np.abs(dist_1_signed)
+    effective_width_1 = np.where(dist_1_signed < 0, tuning_width_1_left, tuning_width_1_right)
+    peak_1 = amplitude_1 * np.exp(-0.5 * (abs_dist_1 / effective_width_1) ** peak_exponent_1)
+
+    # Calculate for the second peak
+    theta_pref_2 = (theta_pref + np.pi + angle_offset_2) % (2 * np.pi)
+    dist_2_signed = signed_circ_dist(theta[:, np.newaxis], theta_pref_2)
+    abs_dist_2 = np.abs(dist_2_signed)
+    effective_width_2 = np.where(dist_2_signed < 0, tuning_width_2_left, tuning_width_2_right)
+    peak_2 = amplitude_2 * np.exp(-0.5 * (abs_dist_2 / effective_width_2) ** peak_exponent_2)
+
+    tuning_curve = baseline + peak_1 + peak_2
 
     return gain[:, np.newaxis] * tuning_curve + np.outer(offset, coupling)
 
-#Each sample of data is shaped (n_trials, n_cells), taken values based on mean of values given by parameter estimator.
+#Each sample of data is shaped (n_trials, n_cells)
 model.DEFAULT_PARAMS = lambda data: {
     "multiplicative_gain": 0.8*np.ones(data['response'].shape[-2]),
     "additive_offset": np.zeros(data['response'].shape[-2]),
     "coupling_factor": -0.03*np.ones(data['response'].shape[-1]),
     "theta_pref": 3*np.ones(data['response'].shape[-1]),
-    "baseline": 0.0007*np.ones(data['response'].shape[-1]),
-    "amplitude_1": 0.02*np.ones(data['response'].shape[-1]),
-    "amplitude_2": 0.01*np.ones(data['response'].shape[-1]),
-    "tuning_width": np.full(data['response'].shape[-1], 0.4),
+    "baseline": np.zeros(data['response'].shape[-1]),
+    "amplitude_1": 0.03*np.ones(data['response'].shape[-1]),
+    "amplitude_2": 0.02*np.ones(data['response'].shape[-1]),
+    "tuning_width_1_left": np.full(data['response'].shape[-1], 0.5),
+    "tuning_width_1_right": np.full(data['response'].shape[-1], 0.5),
+    "tuning_width_2_left": np.full(data['response'].shape[-1], 0.5),
+    "tuning_width_2_right": np.full(data['response'].shape[-1], 0.5),
+    "peak_exponent_1": np.full(data['response'].shape[-1], 2.0),
+    "peak_exponent_2": np.full(data['response'].shape[-1], 2.0),
+    "angle_offset_2": np.zeros(data['response'].shape[-1]),
 }
+
+    
