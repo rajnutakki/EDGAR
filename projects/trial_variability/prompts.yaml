@@ -1,25 +1,28 @@
 model:
   use_image_feedback: true
-  base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses to stimuli across trials. Each trial corresponds to a specific stimulus angle. The models are sorted from highest to lowest loss, where lower loss is better.
+  base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses across trials sorted from highest to lowest loss. 
+    Each trial, a grating of a specific orientation is presented as a visual stimulus.
 
-    Your task is to create a new model that outperforms all previous models. Modify the tuning curve and trial-to-trial variability mechanisms to better fit the data.
+    Your task is to create a new model that will better capture the trial-to-trial variability of these responses, resulting in a model with lower loss.
 
-    All models have access to the stimulus angles presented at each trial (data["stimulus"], of shape (n_trials,)).
+    Models have access to a dictionary `data` containing:
+    - data["stimulus"]: The stimulus angle presented at each trial (in radians), shape (n_trials,).
+    - data["response"]: Neural responses, shape (n_trials, n_cells). In the training data, the bottom-right corner of the response matrix (data["response"][n_trials//2:, n_cells//2:]) is set to NaNs. The rest of the data may be used to generate predictions for the bottom right corner (test data).
+    - data["signal"]: Pre-computed empirical tuning curve (binned mean response) for each cell, shape (n_trials, n_cells). This is computed using ONLY the first-half training trials, representing the trial-averaged stimulus-driven response of each cell.
 
-    The loss will be evaluated in a cross-validated setting, so the model should be able to generalize to unseen data.
+    In order to evaluate the model:
+    1. An initial estimate of `params` is provided by a parameter estimator function.
+    2. The model `params` are optimized by gradient descent to minimize the mean squared error between the model predictions and the responses of the training data.
+    3. The model is evaluated on held-out test data, using the optimized parameters, and the mean squared error is reported as the loss.
 
-    Analyze the progression of models, generalize the improvements, and create a new model that is better than all previous models.
+    The model always generates output of shape (n_trials, n_cells), with the loss for optimization / evaluation only calculated from the corresponding train / test part.
+    The trials are shuffled, so the order of the trials is arbitrary.
+
+    Models will be penalized for complexity, so keep the model simple, while capturing the key features of the trial-to-trial variability in the responses.
     '
-  explore: 'Use the parent models as inspiration, but be creative and try new ideas, exploring new functional forms.
-  
-  
+  explore: 'Analyze the strengths and weaknesses of the models shown, using this insight to inspire new, creative, model designs which outperform previous ones.
     '
-  exploit: 'Use the parent models as a template to produce a stronger model.
-
-    Extrapolate features associated with lower loss and remove weak or redundant structure.
-
-    You will be penalized for complexity, so keep the model as simple as possible.
-
+  exploit: 'Use the parent models as templates to produce better models by combining strengths and removing weaknesses and redundancies.
     '
   code_guidelines: '**Code Generation Guidelines:**
 
@@ -27,7 +30,7 @@ model:
 
     * Do not include any text other than the code.
 
-    * Model signature must be `def model(data, params):` where `data` is a dict with keys "signal", "stimulus", and "response".
+    * Model signature must be `def model(data, params):` where `data` is a dict with keys "stimulus", "response", and "signal".
 
     * params is a dict of named arrays/scalars.
 
@@ -37,10 +40,17 @@ model:
 
     * Cast to `int()` when using a numeric value as an array size, slice index, or `range()` argument (e.g. `n_bins = int(np.sqrt(len(x)))`).
 
-    * You must also provide `default_params`. Since parameter shapes may depend on the number of trials or cells, you MUST provide `default_params` as a Python lambda string that takes `data` as an argument and returns a dictionary.
-      Example: "lambda data: {{''gain'': np.ones(data[''response''].shape[-2])}}"
+    * You must also provide `default_params` as a Python lambda string that takes `data` as an argument and returns a dictionary.
+      To ensure shape compatibility across different splits/evaluations, ALWAYS define parameter shapes dynamically using the shapes of `data["response"]`:
+      - Trial-level parameters (dimension `n_trials`): use `data["response"].shape[-2]`
+      - Cell-level parameters (dimension `n_cells`): use `data["response"].shape[-1]`
+      - Source cell dimension (first half of cells): use `data["response"].shape[-1] // 2`
+      - Target cell dimension (second half of cells): use `data["response"].shape[-1] - data["response"].shape[-1] // 2`
+      Example lambda: "lambda data: {{''multiplicative_gain'': 0.8 * np.ones(data[''response''].shape[-2]), ''coupling_factor'': -0.03 * np.ones(data[''response''].shape[-1])}}"
 
-    * Ensure all string values in function call arguments are properly JSON-escaped
+    * Ensure all string values in function call arguments are properly JSON-escaped.
+
+    * Ensure your model is optimization-friendly: do not apply non-differentiable operations (like `np.round`, `np.floor`, `np.ceil`, or boolean branching/comparisons) to parameters optimized by gradient descent. Avoid in-place array updates (like `x[i] = y`) as they are incompatible with JAX.
     '
   docstring_guidelines: '**Docstring Guidelines:**
 
@@ -50,14 +60,16 @@ model:
 
     '
   image_analysis_instructions: '**Image Analysis Instructions:**\n 
-    Analyze the provided plots comparing model fits with the actual neural responses.
-    In all plots, in the top panel, the actual responses (black dots) are shown on top of model predictions (colored lines, orange for worst average fit, blue for next best, green for best). 
-    The bottom panels show the corresponding Mean Squared Error (MSE), which is sometimes binned, between the actual data and the corresponding models.
+    Use the provided plots to help analyze the models shown.
+
+    In all plots, in the top panel, the actual responses (grey dots) are shown with predictions
+    (colored lines, orange for worst average fit, blue for best). 
+    The bottom panels show the corresponding Mean Squared Error (MSE), between the models and 
+    actual responses.
 
     The plots are organized as follows:
-    Top: Responses from specific trials, with cells on the x-axis sorted by their preferred orientation.
-    Middle: Responses from specific cells, with trials on the x-axis sorted by stimulus angle.
-    Bottom: Responses from specific cells, with arbitrary trial order on the x-axis.
+    Top: Responses from specific trials, with cells on the x-axis sorted by their preferred orientation, the stimulus angle shown in the trial is indicated by the red dotted line.
+    Bottom: Responses from specific cells, with trials on the x-axis sorted by stimulus angle, showing the tuning curve of the cell with trial-by-trial variability.
 
     Analyze where the models fail to capture the actual responses, and identify patterns in the errors. For example, does the model consistently under/over predict trials with large/small responses? Use this information to inform your model design, considering how the model can be improved to overcome identified shortcomings.
     '
@@ -75,14 +87,11 @@ model:
   - code.model
 
 parameter_estimator:
-  base: 'You are an AI scientist. Your task is to create a simple parameter estimator function to estimate the free parameters of the latest model (shown last below). Also included are previous parent models and their parameter estimators.
+  base: 'You are an AI scientist. Your task is to create a parameter estimator function to estimate the free parameters of the latest model (shown last below). Also included are previous parent models and their parameter estimators. Your parameter estimator will be used to initialize the parameters of the model before they are optimized by gradient descent, so should aim to minimize the mean-squared error between the model predictions and the responses of the data.
 
-    The parameter should be estimated directly, using statistical principles and knowledge of what the parameters represent biologically.
+    The parameters should be estimated directly, using statistical principles and knowledge of what the parameters do in the model.
 
-    Analyze the progression of the parameter estimators, generalize the improvements, and create a new parameter estimator that is better than all previous estimators.
-
-    Parameter estimators which take too long to run will be rejected, so keep the estimator simple and efficient.
-
+    Parameter estimators that take longer than 1 minute to run will be rejected.
     '
   explore: null
   exploit: null
@@ -92,16 +101,26 @@ parameter_estimator:
 
     * Do not include any text other than the code.
 
-    * Return a parameter dict with the same keys, and with values of the correct shape expected by the model.
+    * Return a parameter dictionary containing exactly the same keys and value shapes expected by the latest model. Ensure all array parameters are converted using `.astype(float)` before returning.
 
     * Function signature must be `def parameter_estimator(data):`.
 
-    * data is a dictionary with the keys : "stimulus", "response" and "signal". 
-    
+    * data is a dictionary with the keys: "stimulus", "response" and "signal".
+
+    * **Handling NaNs:** In the data, the bottom-right corner of the response matrix (`data["response"][n_trials//2:, n_cells//2:]`) is set to `NaN`.
+      - All other regions of the array are NaN-free. Operations restricted to these regions are safe.
+      - If your estimation statistics span the bottom-right region, ALWAYS use NaN-safe numpy operations (e.g., `np.nanmean`, `np.nanstd`, `np.nanmin`, `np.nanmax`, or `np.nan_to_num(..., nan=0.0)`) to prevent `NaN` values from propagating into your parameters.
+
+    * **Parameter Dimensions:** Ensure shapes scale dynamically with the dataset dimensions:
+      - Trial-level parameters (dimension `n_trials`): use `data["response"].shape[-2]`
+      - Cell-level parameters (dimension `n_cells`): use `data["response"].shape[-1]`
+      - Source cell dimension (first half of cells): use `data["response"].shape[-1] // 2`
+      - Target cell dimension (second half of cells): use `data["response"].shape[-1] - data["response"].shape[-1] // 2`
+
+    * **Performance:** Use vectorized NumPy operations instead of nested loops. 
+    Parameter estimators that take longer than 1 minute to run will be immediately rejected.
+
     * Your response **must** be less than {max_lines} lines. If it is longer, it will be immediately rejected.
-
-    * Do not attempt to fit the parameters using complex fitting functions like `curve_fit`, `least_squares` or `minimize`. This function should be a simple starting point.
-
     '
   docstring_guidelines: '**Docstring Guidelines:**
 
@@ -153,6 +172,8 @@ jax_translator_model:
     * Replace all boolean indexing with `jnp.where`.
 
     * Use `jnp` everywhere (no `np`).
+
+    * **In-place updates:** JAX arrays are immutable. Translate any in-place array assignments (like `x[idx] = y`) to JAX functional update syntax: `x = x.at[idx].set(y)`.
 
     * Avoid Python control flow (if/for) that depends on array values.
 
