@@ -139,8 +139,8 @@ def load_data(
             resp_all = resp_all[shuffled_idx]
             ang_all = ang_all[shuffled_idx]
 
-        # Partition back into discovery and validation using 2/3 and 1/3 of the trials respectively
-        n_disc = sum(r.shape[0] for r in responses_filtered[:2])
+        # Partition back into discovery and validation using a 50/50 split of the trials
+        n_disc = len(resp_all) // 2
         resp_disc = resp_all[:n_disc]
         ang_disc = ang_all[:n_disc]
         resp_val = resp_all[n_disc:]
