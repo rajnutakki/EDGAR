@@ -40,7 +40,6 @@ def _filter_cells(
     responses_list: list[np.ndarray], angles_list: list[np.ndarray], activity_thresh: float, conc_thresh: float
 ) -> list[np.ndarray]:
     """Filter cells based on global activity and vector concentration.
-        TODO: maybe filter differently for discover vs validate sets, e.g some cells good in discover but not validate ,or vice versa
     """
     all_responses = np.vstack(responses_list)
     all_angles = np.concatenate(angles_list)
@@ -70,8 +69,8 @@ def _get_signal(
     return sig_all, bin_centers, avg_resp
 
 
-def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray) -> tuple[dict, dict]:
-    """Create train/test pairs by masking the bottom-right corner of the response matrix."""
+def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray):
+    """Create train data by masking the bottom-right corner of the response matrix."""
     n_trials, n_cells = resp.shape
     trial_mid, cell_mid = n_trials // 2, n_cells // 2
 
@@ -82,16 +81,7 @@ def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray) -> tu
     sig_train = sig.copy()
     sig_train[trial_mid:, cell_mid:] = 0.0
 
-    # Test: Mask out everything EXCEPT bottom right corner
-    resp_test = np.full_like(resp, np.nan)
-    resp_test[trial_mid:, cell_mid:] = resp[trial_mid:, cell_mid:]
-    sig_test = np.zeros_like(sig)
-    sig_test[trial_mid:, cell_mid:] = sig[trial_mid:, cell_mid:]
-
-    return (
-        {"response": resp_train, "signal": sig_train, "stimulus": ang},
-        {"response": resp_test, "signal": sig_test, "stimulus": ang},
-    )
+    return {"response": resp_train, "signal": sig_train, "stimulus": ang}
 
 
 def load_data(
@@ -160,18 +150,19 @@ def load_data(
         sig_disc, bin_centers, avg_resp_disc = _get_signal(resp_disc, ang_disc, n_bins)
         sig_val, _, avg_resp_val = _get_signal(resp_val, ang_val, n_bins)
 
-        # 4. Masking
-        disc_train, disc_test = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
-        val_train, val_test = _apply_corner_mask(resp_val, sig_val, ang_val)
+        # 4. Masking out of bottom right for train data
+        disc_train = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
+        disc_test = {"response": resp_disc, "signal": sig_disc, "stimulus": ang_disc}
+        val_train = _apply_corner_mask(resp_val, sig_val, ang_val)
+        val_test = {"response": resp_val, "signal": sig_val, "stimulus": ang_val}
 
-
-        # 6. Add Sample Dimension to ALL fields
+        # 5. Add Sample Dimension to ALL fields
         for d in [disc_train, disc_test, val_train, val_test]:
-            for k in d:
-                if isinstance(d[k], np.ndarray):
-                    d[k] = d[k][np.newaxis, ...]
+            for k,v in d.items():
+                if isinstance(v, np.ndarray):
+                    d[k] = v[np.newaxis, ...]
         
-        # 7. Fingerprinting (Evaluation Set)
+        # 6. Fingerprinting (Evaluation Set)
         eval_data = {**disc_train, "_sample_indices": np.array([0])}
 
         if show_plots:
@@ -228,27 +219,28 @@ def _plot_tuning_verification(all_resp, all_ang, bin_centers, avg_resp, seed):
     plt.savefig("tuning_curve_verification.png")
     plt.close()
 
-def loss_fn(model_output, data):
+def loss_fn_train(model_output, data):
+    filter = ~jnp.isnan(data["response"]) # response set to NaN where we don't want to evaluate the loss
+    return _filtered_loss_fn(model_output, data, filter)
+
+def loss_fn_test(model_output, data):
+    n_trials, n_cells = data["response"].shape[-2], data["response"].shape[-1]
+    filter = jnp.zeros((n_trials, n_cells), dtype=bool)
+    filter = filter.at[n_trials//2:, n_cells//2:].set(True) #Set bottom-right corner to True, so only evaluate the loss there
+    return _filtered_loss_fn(model_output, data, filter)
+
+def _filtered_loss_fn(model_output, data, filter):
     """
-    Mean squared error loss, safely ignoring NaNs for jax.grad.
+    Mean squared error loss, only computed where the filter is True.
     Due to backpropagation in jax.grad need to ensure that there are no NaNs during the forward pass through the loss.
     Expects data['response'] of shape (n_samples, n_trials, n_cells).
     Returns (n_samples,) array of losses.
     """
-    # 1. Create a boolean mask (True where data is valid)
-    mask = ~jnp.isnan(data["response"])
-
-    # 2. Clean the raw data and model output so the subtraction doesn't create NaNs
-    # Even if model_output has NaNs where mask is False, we replace them with 0.0
-    # to prevent them from poisoning the gradient.
-    clean_response = jnp.where(mask, data["response"], 0.0)
-    safe_model_output = jnp.where(mask, model_output, 0.0)
-
-    # 3. Compute squared error
-    diff_sq = (clean_response - safe_model_output) ** 2
-
-    # 4. Manually compute the mean across trials and cells (axis -2 and -1)
+    clean_response = jnp.where(filter, data["response"], 0.0) #set the response to zero where filter is False, to avoid evaluating NaNs
+    safe_model_output = jnp.where(filter, model_output, 0.0) #set the prediction to zero where filter is False
+    diff_sq = (clean_response - safe_model_output) ** 2 #squared error where filter is True, zero where filter is False
+    #Compute mean across trials and cells for unmasked entries
     total_error = jnp.sum(diff_sq, axis=(-2, -1))
-    valid_count = jnp.sum(mask, axis=(-2, -1))
+    valid_count = jnp.sum(filter, axis=(-2, -1))
 
     return 1e5 * total_error / valid_count
