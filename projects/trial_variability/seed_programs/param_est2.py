@@ -2,12 +2,10 @@ import numpy as np
 
 def parameter_estimator(data):
     """
-    Compute the weight matrix, W and bias vector, b, for peer prediction model, using reduced rank regression with a fixed rank.
+    Compute the weight matrix, W_A and W_B, and bias vector, b, for peer prediction model, using reduced rank regression.
     """
     responses = data["response"] #(n_trials, n_cells)
     n_trials, n_cells = responses.shape
-    source = responses[:, :n_cells//2] # (n_trials, n_source)
-    target = responses[:, n_cells//2:] # (n_trials, n_target)
 
     # Fit only on the first half of trials
     trial_mid = n_trials // 2
@@ -29,10 +27,24 @@ def parameter_estimator(data):
     V = Vh.T
     fixed_rank = 30
     r = min(fixed_rank, S.shape[0])
-    W = W_ols @ V[:, :r] @ Vh[:r, :]
-    b = Y_mean - X_mean @ W #compute the intercept
+
+    n_source = X.shape[1]
+    n_target = Y.shape[1]
+
+    # Initialize low-rank matrices W_A and W_B with zeros
+    W_A = np.zeros((n_source, fixed_rank))
+    W_B = np.zeros((fixed_rank, n_target))
+
+    # Populate top r components
+    W_A[:, :r] = W_ols @ V[:, :r]
+    W_B[:r, :] = Vh[:r, :]
+
+    # Compute the intercept using the low-rank reconstructed weight matrix
+    W_lowrank = W_A @ W_B
+    b = Y_mean - X_mean @ W_lowrank #compute the intercept
 
     return {
-        "W": W.astype(float),
+        "W_A": W_A.astype(float),
+        "W_B": W_B.astype(float),
         "b": b.astype(float)
     }
