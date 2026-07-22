@@ -147,7 +147,7 @@ def plot_model_fits(
                 zorder=5
             )
             
-            # Compute point-by-point squared error (MSE)
+            # Compute point-by-point squared error
             sq_err = (y_pred_sorted[trial_idx] - sorted_actual[trial_idx]) ** 2
             ax2.plot(
                 sorted_pref_angles,
@@ -190,7 +190,7 @@ def plot_model_fits(
         ax1.tick_params(labelbottom=False, labelsize=9)
         
         ax2.set_xlabel("Pref. Orientation (rad)", fontsize=10)
-        ax2.set_ylabel("MSE", fontsize=9)
+        ax2.set_ylabel("Squared Error", fontsize=9)
         ax2.tick_params(labelsize=9)
         if i == 0:
             ax1.legend(fontsize=8, loc="upper right")
@@ -244,7 +244,7 @@ def plot_model_fits(
         ax1.tick_params(labelbottom=False, labelsize=9)
         
         ax2.set_xlabel("Stimulus Angle (rad)", fontsize=10)
-        ax2.set_ylabel("MSE", fontsize=9)
+        ax2.set_ylabel("Squared Error", fontsize=9)
         ax2.tick_params(labelsize=9)
         if i == 0:
             ax1.legend(fontsize=8, loc="upper right")
