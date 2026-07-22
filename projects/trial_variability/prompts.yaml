@@ -8,7 +8,6 @@ model:
     Models have access to a dictionary `data` containing:
     - data["stimulus"]: The stimulus angle presented at each trial (in radians), shape (n_trials,).
     - data["response"]: Neural responses, shape (n_trials, n_cells). In the training data, the bottom-right corner of the response matrix (data["response"][n_trials//2:, n_cells//2:]) is set to NaNs. The rest of the data may be used to generate predictions for the bottom right corner (test data).
-    - data["signal"]: Pre-computed empirical tuning curve (binned mean response) for each cell, shape (n_trials, n_cells). This is computed using ONLY the first-half training trials, representing the trial-averaged stimulus-driven response of each cell.
 
     In order to evaluate the model:
     1. An initial estimate of `params` is provided by a parameter estimator function.
@@ -30,7 +29,7 @@ model:
 
     * Do not include any text other than the code.
 
-    * Model signature must be `def model(data, params):` where `data` is a dict with keys "stimulus", "response", and "signal".
+    * Model signature must be `def model(data, params):` where `data` is a dict with keys "stimulus", "response".
 
     * params is a dict of named arrays/scalars.
 
@@ -64,8 +63,8 @@ model:
 
     In all plots, in the top panel, the actual responses (grey dots) are shown with predictions
     (colored lines, orange for worst average fit, blue for best). 
-    The bottom panels show the corresponding Mean Squared Error (MSE), between the models and 
-    actual responses.
+    The bottom panels show the corresponding Squared Error, `(y_pred - y_model)**2`, between the actual responses and 
+    model predictions.
 
     The plots are organized as follows:
     Top: Responses from specific trials, with cells on the x-axis sorted by their preferred orientation, the stimulus angle shown in the trial is indicated by the red dotted line.
@@ -91,7 +90,7 @@ parameter_estimator:
 
     The parameters should be estimated directly, using statistical principles and knowledge of what the parameters do in the model.
 
-    Parameter estimators that take longer than 1 minute to run will be rejected.
+    Parameter estimators that take longer than 1 minute to run will be rejected, so keep it simple.
     '
   explore: null
   exploit: null
@@ -105,7 +104,7 @@ parameter_estimator:
 
     * Function signature must be `def parameter_estimator(data):`.
 
-    * data is a dictionary with the keys: "stimulus", "response" and "signal".
+    * data is a dictionary with the keys: "stimulus", "response".
 
     * **Handling NaNs:** In the data, the bottom-right corner of the response matrix (`data["response"][n_trials//2:, n_cells//2:]`) is set to `NaN`.
       - All other regions of the array are NaN-free. Operations restricted to these regions are safe.
@@ -118,7 +117,6 @@ parameter_estimator:
       - Target cell dimension (second half of cells): use `data["response"].shape[-1] - data["response"].shape[-1] // 2`
 
     * **Performance:** Use vectorized NumPy operations instead of nested loops. 
-    Parameter estimators that take longer than 1 minute to run will be immediately rejected.
 
     * Your response **must** be less than {max_lines} lines. If it is longer, it will be immediately rejected.
     '
