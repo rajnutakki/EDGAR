@@ -2,10 +2,10 @@ import numpy as np
 
 def model(data, params):
     """
-    Peer prediction with rank 5 matrix factorization W = W_A @ W_B.
+    Peer prediction with rank 30 matrix factorization W = W_A @ W_B.
     """
-    W_A = params["W_A"] #(n_source, 5)
-    W_B = params["W_B"] #(5, n_target)
+    W_A = params["W_A"] #(n_source, 30)
+    W_B = params["W_B"] #(30, n_target)
     b = params["b"]
     responses = data["response"]  # (n_trials, n_cells)
     n_trials, n_cells = responses.shape
@@ -15,7 +15,7 @@ def model(data, params):
 
 # Each sample of data is shaped (n_trials, n_cells)
 model.DEFAULT_PARAMS = lambda data: {
-    "W_A": np.ones((data['response'].shape[-1]//2, 5)),
-    "W_B": np.ones((5, data['response'].shape[-1] - data['response'].shape[-1]//2)),
+    "W_A": np.ones((data['response'].shape[-1]//2, 30)),
+    "W_B": np.ones((30, data['response'].shape[-1] - data['response'].shape[-1]//2)),
     "b": np.zeros(data['response'].shape[-1] - data['response'].shape[-1]//2),
 }
