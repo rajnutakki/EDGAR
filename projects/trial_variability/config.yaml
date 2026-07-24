@@ -20,6 +20,7 @@ llms:
   model_llm: gemini-2.5-flash
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
+  max_tokens: 20000
 
 scoring:
   param_penalty_weight: 5e-5
