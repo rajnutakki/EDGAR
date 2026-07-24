@@ -122,6 +122,7 @@ def main():
             params=[params_default, params_est, params_opt, params_opt_default],
             program_names=["Default", "Estimated", "Opt from Est", "Opt from Default"],
             title_prefix=f"Seed Model {model_num} Comparison Across Parameter Sets",
+            rng=np.random.default_rng(),
         )
         print(
             f"Saved standard population fit plot to sandbox/trial_variability/fit_comparison_model{model_num}.png"
