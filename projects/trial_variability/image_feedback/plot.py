@@ -79,10 +79,15 @@ def plot_model_fits(
     complex_sum = np.nansum(sig * np.exp(2j * stims)[:, np.newaxis], axis=0)
     pref_angles = (np.angle(complex_sum) / 2.0) % np.pi
 
-    # Filter out cells that are entirely NaN in the response (masked out)
+    # Restrict to test-set region: bottom-right corner (trials n//2:, cells n//2:)
+    n_trials, n_cells = actual_response.shape
+    trial_mid, cell_mid = n_trials // 2, n_cells // 2
+
+    # Filter out cells that are entirely NaN, then keep only the right-half (test) cells
     valid_cells = np.where(~np.all(np.isnan(actual_response), axis=0))[0]
+    valid_cells = valid_cells[valid_cells >= cell_mid]
     if len(valid_cells) == 0:
-        valid_cells = np.arange(actual_response.shape[1])
+        valid_cells = np.arange(cell_mid, n_cells)
 
     # Sort only the valid cells
     pref_angles_valid = pref_angles[valid_cells]
@@ -92,10 +97,11 @@ def plot_model_fits(
     sorted_pref_angles = pref_angles[final_cell_idx]
     sorted_actual = actual_response[:, final_cell_idx]
 
-    # 4. Pick 3 random trials and cells that actually have data
+    # 4. Pick 3 random trials and cells from the test set (bottom-right corner)
     valid_trials = np.where(~np.all(np.isnan(actual_response), axis=1))[0]
+    valid_trials = valid_trials[valid_trials >= trial_mid]
     if len(valid_trials) == 0:
-        valid_trials = np.arange(len(stims))
+        valid_trials = np.arange(trial_mid, n_trials)
 
     n_show = min(3, len(valid_trials))
     random_trials = rng.choice(valid_trials, size=n_show, replace=False)

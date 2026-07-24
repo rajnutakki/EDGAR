@@ -25,7 +25,7 @@ def parameter_estimator(data):
     Y_hat = X_c @ W_ols
     U, S, Vh = np.linalg.svd(Y_hat, full_matrices=False)
     V = Vh.T
-    fixed_rank = 5
+    fixed_rank = 30
     r = min(fixed_rank, S.shape[0])
 
     n_source = X.shape[1]
