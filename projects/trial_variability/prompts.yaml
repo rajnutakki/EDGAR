@@ -1,25 +1,38 @@
 model:
   use_image_feedback: true
-  base: 'You are an AI scientist. The {num_parents} programs below are models of neural responses across trials sorted from highest to lowest loss. 
+  base: 'You are an AI scientist. The {num_parents} programs below are models of V1 neural responses across trials sorted from highest to lowest loss. 
     Each trial, a grating of a specific orientation is presented as a visual stimulus.
 
     Your task is to create a new model that will better capture the trial-to-trial variability of these responses, resulting in a model with lower loss.
 
+    Things to consider:
+
+    - Sources of trial-to-trial variability and their effects on population responses.
+
+    - Stimulus-dependent, spontaneous, population-level and network effects.
+
+    - How correlations can be captured by low-dimensional structures.
+
     Models have access to a dictionary `data` containing:
+
     - data["stimulus"]: The stimulus angle presented at each trial (in radians), shape (n_trials,).
+
     - data["response"]: Neural responses, shape (n_trials, n_cells). In the training data, the bottom-right corner of the response matrix (data["response"][n_trials//2:, n_cells//2:]) is set to NaNs. The rest of the data may be used to generate predictions for the bottom right corner (test data).
 
     In order to evaluate the model:
+
     1. An initial estimate of `params` is provided by a parameter estimator function.
+
     2. The model `params` are optimized by gradient descent to minimize the mean squared error between the model predictions and the responses of the training data.
+
     3. The model is evaluated on held-out test data, using the optimized parameters, and the mean squared error is reported as the loss.
 
     The model always generates output of shape (n_trials, n_cells), with the loss for optimization / evaluation only calculated from the corresponding train / test part.
-    The trials are shuffled, so the order of the trials is arbitrary.
+    The trials are shuffled so that the order of the trials is arbitrary.
 
-    Models will be penalized for complexity, so keep the model simple, while capturing the key features of the trial-to-trial variability in the responses.
+    Models are penalized for complexity by adding a term proportional to the number of free parameters to the loss.
     '
-  explore: 'Analyze the strengths and weaknesses of the models shown, using this insight to inspire new, creative, model designs which outperform previous ones.
+  explore: 'Analyze the strengths and weaknesses of the models shown, using this insight to inspire new and creative model designs which outperform previous ones.
     '
   exploit: 'Use the parent models as templates to produce better models by combining strengths and removing weaknesses and redundancies.
     '
@@ -40,11 +53,17 @@ model:
     * Cast to `int()` when using a numeric value as an array size, slice index, or `range()` argument (e.g. `n_bins = int(np.sqrt(len(x)))`).
 
     * You must also provide `default_params` as a Python lambda string that takes `data` as an argument and returns a dictionary.
+
       To ensure shape compatibility across different splits/evaluations, ALWAYS define parameter shapes dynamically using the shapes of `data["response"]`:
+
       - Trial-level parameters (dimension `n_trials`): use `data["response"].shape[-2]`
+
       - Cell-level parameters (dimension `n_cells`): use `data["response"].shape[-1]`
+
       - Source cell dimension (first half of cells): use `data["response"].shape[-1] // 2`
+
       - Target cell dimension (second half of cells): use `data["response"].shape[-1] - data["response"].shape[-1] // 2`
+
       Example lambda: "lambda data: {{''multiplicative_gain'': 0.8 * np.ones(data[''response''].shape[-2]), ''coupling_factor'': -0.03 * np.ones(data[''response''].shape[-1])}}"
 
     * Ensure all string values in function call arguments are properly JSON-escaped.
@@ -57,25 +76,38 @@ model:
 
     * Briefly describe what the model computes, including an equation.
 
+    * Specify the shapes of all free parameters in the model.
+
+    * Explicitly specify the rank of any matrix factorizations used in the model.
+
     '
-  image_analysis_instructions: '**Image Analysis Instructions:**\n 
+  image_analysis_instructions: '**Image Analysis Instructions:**
+
     Use the provided plots to help analyze the models shown.
 
     In all plots, in the top panel, the actual responses (grey dots) are shown with predictions
     (colored lines, orange for worst average fit, blue for best). 
+
     The bottom panels show the corresponding Squared Error, `(y_pred - y_model)**2`, between the actual responses and 
     model predictions.
 
     The plots are organized as follows:
+
     Top: Responses from specific trials, with cells on the x-axis sorted by their preferred orientation, the stimulus angle shown in the trial is indicated by the red dotted line.
+
     Bottom: Responses from specific cells, with trials on the x-axis sorted by stimulus angle, showing the tuning curve of the cell with trial-by-trial variability.
 
-    Analyze where the models fail to capture the actual responses, and identify patterns in the errors. For example, does the model consistently under/over predict trials with large/small responses? Use this information to inform your model design, considering how the model can be improved to overcome identified shortcomings.
+    Analyze where the models fail to capture the actual responses and identify patterns in the errors across plots. For example, does the model consistently under/over predict trials or cells with large/small responses? How could you modify the model to better capture these trial or cell-specific variations?
+    Do you need to introduce additional free parameters or can you modify existing ones?
+
+    Use this analysis to inform the design of the new model, point to specific features in the plots which illustrate the strengths and weaknesses of the previous models and explain how the weaknesses can be addressed in the new model. Include this analysis in your reasoning.
     '
 
   parent_program_template: '**Model: {name}**
 
     loss: {program_losses_discover_final}
+
+    number of free parameters: {n_params}
 
     {code_model}
 
@@ -83,6 +115,7 @@ model:
   parent_program_vars:
   - name
   - program_losses.discover.final
+  - n_params
   - code.model
 
 parameter_estimator:
@@ -107,13 +140,19 @@ parameter_estimator:
     * data is a dictionary with the keys: "stimulus", "response".
 
     * **Handling NaNs:** In the data, the bottom-right corner of the response matrix (`data["response"][n_trials//2:, n_cells//2:]`) is set to `NaN`.
+
       - All other regions of the array are NaN-free. Operations restricted to these regions are safe.
+
       - If your estimation statistics span the bottom-right region, ALWAYS use NaN-safe numpy operations (e.g., `np.nanmean`, `np.nanstd`, `np.nanmin`, `np.nanmax`, or `np.nan_to_num(..., nan=0.0)`) to prevent `NaN` values from propagating into your parameters.
 
     * **Parameter Dimensions:** Ensure shapes scale dynamically with the dataset dimensions:
+
       - Trial-level parameters (dimension `n_trials`): use `data["response"].shape[-2]`
+
       - Cell-level parameters (dimension `n_cells`): use `data["response"].shape[-1]`
+
       - Source cell dimension (first half of cells): use `data["response"].shape[-1] // 2`
+
       - Target cell dimension (second half of cells): use `data["response"].shape[-1] - data["response"].shape[-1] // 2`
 
     * **Performance:** Use vectorized NumPy operations instead of nested loops. 
