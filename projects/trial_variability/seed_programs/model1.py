@@ -2,9 +2,10 @@ import numpy as np
 
 def model(data, params):
     """
-    Affine shared variability model, consisting of gain modulation + additive offset, with a skewed asymmetric double gaussian tuning curve per cell.
+    Affine shared variability model (Lin 2015), consisting of gain modulation + additive offset, with a generalized double gaussian tuning curve per cell.
+    The gain term uniformly scales the sensory drive of all neurons, while the sensory-independent additive offset affects different neurons differently, according to a coupling factor.
 
-    Equation : f(t,c) = multiplicative_gain(t) * r(theta(t), c) + additive_offset(t) * coupling_factor(c) where r(theta(t), c) is the skewed asymmetric double-peaked gaussian tuning curve.
+    Equation : f(t,c) = multiplicative_gain(t) * r(theta(t), c) + additive_offset(t) * coupling_factor(c) where r(theta(t), c) is the generalized double-peaked gaussian tuning curve.
 
     data['stimulus'] = theta  # stimulus angle (radians), shape (n_trials,)
 
