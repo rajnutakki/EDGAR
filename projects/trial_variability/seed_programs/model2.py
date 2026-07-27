@@ -2,7 +2,8 @@ import numpy as np
 
 def model(data, params):
     """
-    Peer prediction with rank 30 matrix factorization W = W_A @ W_B.
+    Source -> target cell peer prediction, X_target = X_source @ W + b, with rank 30 matrix factorization W = W_A @ W_B.
+    The reduced rank ensures the model generalizes to held-out data.
     """
     W_A = params["W_A"] #(n_source, 30)
     W_B = params["W_B"] #(30, n_target)
