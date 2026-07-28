@@ -85,7 +85,7 @@ model:
 
     Use the provided plots to help analyze the models shown.
 
-    In all plots, in the top panel, the actual responses (grey dots) are shown with predictions
+    In all plots, in the top panel, the actual responses (colored dots) are shown with predictions
     (colored lines, orange for worst average fit, blue for best). 
 
     The bottom panels show the corresponding Squared Error, `(y_pred - y_model)**2`, between the actual responses and 
@@ -93,9 +93,11 @@ model:
 
     The plots are organized as follows:
 
-    Top: Responses from specific trials, with cells on the x-axis sorted by their preferred orientation, the stimulus angle shown in the trial is indicated by the red dotted line.
+    Top: Responses from specific trials, with cells sorted by their predicted response from the best model on the x-axis. The colormap of the dots indicates the difference in orientation 
+    between the presented stimulus on this trial and the preferred orientation of the cell.
 
-    Bottom: Responses from specific cells, with trials on the x-axis sorted by stimulus angle, showing the tuning curve of the cell with trial-by-trial variability.
+    Bottom: Responses from specific cells, with trials on the x-axis sorted by stimulus angle, showing the tuning curve of the cell with trial-by-trial variability. The colormap of the dots
+    indicates the density of points in the plot. 
 
     Analyze where the models fail to capture the actual responses and identify patterns in the errors across plots. For example, does the model consistently under/over predict trials or cells with large/small responses? How could you modify the model to better capture these trial or cell-specific variations?
     Do you need to introduce additional free parameters or can you modify existing ones?
