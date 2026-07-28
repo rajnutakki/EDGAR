@@ -4,7 +4,6 @@ Fake-LLM runner for testing dynamic default_params without real API calls.
 
 import asyncio
 import os
-import shutil
 from pathlib import Path
 
 from edgar.io.config import Config
@@ -23,7 +22,6 @@ def build_array_params_fake_spec(output_dir: Path) -> TaskSpec:
     """Build a TaskSpec wired with fake LLMs using array-parameter programs."""
     config = Config.from_yaml(CONFIG_PATH)
     spec = TaskSpec.from_config(config)
-    shutil.rmtree(output_dir, ignore_errors=True)
     os.makedirs(output_dir, exist_ok=True)
     spec.io["save_path"] = str(output_dir)
 
