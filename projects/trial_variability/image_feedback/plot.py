@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import jax
 import jax.numpy as jnp
+from scipy.stats import gaussian_kde
 
 
 def plot_model_fits(
@@ -52,7 +53,7 @@ def plot_model_fits(
         "tab:olive",
     ]
     model_alphas = [0.8, 0.5, 0.3]
-    data_color = "black"
+    # data_color = "black"
 
     if save_path == "":
         raise ValueError("plot_model_fits requires a non-empty save_path")
@@ -151,6 +152,15 @@ def plot_model_fits(
     fig = plt.figure(figsize=(18, 16))
     outer_gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.25)
 
+    # Determine the model whose prediction is used for sorting the cells
+    # We will sort by the last model's predictions (index -1)
+    best_model_idx = len(programs) - 1
+    best_model_name = (
+        program_names[best_model_idx]
+        if best_model_idx < len(program_names)
+        else f"Model {best_model_idx + 1}"
+    )
+
     # --- ROW 1: POPULATION FITS (3 trials) ---
     for i, trial_idx in enumerate(random_trials):
         ax_slot = outer_gs[0, i]
@@ -161,12 +171,17 @@ def plot_model_fits(
 
         angle = stims[trial_idx]
 
+        # Sort the cells by the last model's predictions at this specific trial
+        sort_idx_cell = np.argsort(predictions_sorted[best_model_idx][trial_idx])
+        n_cells_shown = len(final_cell_idx)
+        x_coords_cells = np.arange(n_cells_shown)
+
         # Plot each model's prediction
         for j, y_pred_sorted in enumerate(predictions_sorted):
             label = program_names[j] if j < len(program_names) else f"Model {j + 1}"
             ax1.plot(
-                sorted_pref_angles,
-                y_pred_sorted[trial_idx],
+                x_coords_cells,
+                y_pred_sorted[trial_idx][sort_idx_cell],
                 color=model_colors[j % len(model_colors)],
                 linewidth=1.5,
                 alpha=model_alphas[j % len(model_alphas)],
@@ -177,34 +192,34 @@ def plot_model_fits(
             # Compute point-by-point squared error
             sq_err = (y_pred_sorted[trial_idx] - sorted_actual[trial_idx]) ** 2
             ax2.plot(
-                sorted_pref_angles,
-                sq_err,
+                x_coords_cells,
+                sq_err[sort_idx_cell],
                 color=model_colors[j % len(model_colors)],
                 linewidth=1.5,
                 alpha=model_alphas[j % len(model_alphas)],
             )
 
-        # Plot actual/observed responses as scatter
-        ax1.scatter(
-            sorted_pref_angles,
-            sorted_actual[trial_idx],
-            color=data_color,
+        # Calculate periodic orientation difference between cell preferred angles and the stimulus angle
+        # Since orientations are pi-periodic, difference is in [0, pi/2]
+        angle_diffs = np.abs(np.angle(np.exp(2j * (sorted_pref_angles - angle))) / 2.0)
+
+        # Plot actual/observed responses as scatter, colored by orientation difference
+        sc = ax1.scatter(
+            x_coords_cells,
+            sorted_actual[trial_idx][sort_idx_cell],
+            c=angle_diffs[sort_idx_cell],
+            cmap="viridis",
+            vmin=0,
+            vmax=np.pi / 2.0,
             s=15,
-            alpha=0.3,
+            alpha=0.5,
             label="Observed",
             zorder=10,
         )
 
-        # Stimulus angle vertical line
-        ax1.axvline(
-            angle % np.pi,
-            color="red",
-            linestyle="--",
-            alpha=0.6,
-            label="Stimulus Angle",
-            zorder=1,
-        )
-        ax2.axvline(angle % np.pi, color="red", linestyle="--", alpha=0.6, zorder=1)
+        # Add layout-preserving colorbar across both subplots (ax1 and ax2) to keep them aligned
+        cbar = fig.colorbar(sc, ax=[ax1, ax2], pad=0.02, aspect=25)
+        cbar.set_label("Orientation difference (stim - pref) (rad)")
 
         ax1.set_title(
             f"Population Response: Trial {trial_idx}\n(Stimulus: {angle:.2f} rad)",
@@ -214,7 +229,7 @@ def plot_model_fits(
         ax1.set_ylabel("Response", fontsize=10)
         ax1.tick_params(labelbottom=False, labelsize=9)
 
-        ax2.set_xlabel("Pref. Orientation (rad)", fontsize=10)
+        ax2.set_xlabel(f"Cells (sorted by {best_model_name} prediction)", fontsize=10)
         ax2.set_ylabel("Squared Error", fontsize=9)
         ax2.tick_params(labelsize=9)
         if i == 0:
@@ -252,16 +267,32 @@ def plot_model_fits(
                 alpha=model_alphas[j % len(model_alphas)],
             )
 
-        # Plot actual/observed responses as scatter
-        ax1.scatter(
-            stims,
-            actual_response[:, cell],
-            color=data_color,
-            s=20,
-            alpha=0.3,
+        # Filter out NaN values for density calculation and plotting
+        non_nan_mask = ~np.isnan(stims) & ~np.isnan(actual_response[:, cell])
+        x_coords_tc = stims[non_nan_mask]
+        y_coords_tc = actual_response[non_nan_mask, cell]
+
+        if len(x_coords_tc) > 1:
+            xy = np.vstack([x_coords_tc, y_coords_tc])
+            density = gaussian_kde(xy)(xy)
+        else:
+            density = np.ones_like(x_coords_tc)
+
+        # Plot actual/observed responses as scatter, colored by density
+        sc = ax1.scatter(
+            x_coords_tc,
+            y_coords_tc,
+            c=density,
+            cmap="viridis",
+            s=15,
+            alpha=0.5,
             label="Observed",
             zorder=10,
         )
+
+        # Add layout-preserving colorbar across both subplots (ax1 and ax2) to keep them aligned
+        cbar = fig.colorbar(sc, ax=[ax1, ax2], pad=0.02, aspect=25)
+        cbar.set_label("Density")
 
         # Set titles and labels
         ax1.set_title(
@@ -278,23 +309,6 @@ def plot_model_fits(
         if i == 0:
             ax1.legend(fontsize=8, loc="upper right")
 
-    # Construct Title
-    summary_parts = []
-    for i in range(len(programs)):
-        name = program_names[i]
-        loss = losses[i]
-        if loss is not None:
-            summary_parts.append(f"{name} loss: {loss:.4f}")
-        else:
-            summary_parts.append(f"{name} loss: n/a")
-
-    title = " | ".join(summary_parts)
-    if title_prefix:
-        title = f"{title_prefix}\n{title}"
-    else:
-        title = f"Model Fits and Predictions vs Observed Target Responses\n{title}"
-
-    plt.suptitle(title, fontsize=14, fontweight="bold", y=0.99)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(save_path, bbox_inches="tight", dpi=140)
     plt.close()
