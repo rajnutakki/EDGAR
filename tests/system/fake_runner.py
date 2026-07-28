@@ -11,7 +11,6 @@ Example usage:
 
 import asyncio
 import os
-import shutil
 from pathlib import Path
 
 from edgar.io.config import Config
@@ -28,7 +27,6 @@ def build_fake_spec(output_dir: Path) -> TaskSpec:
     """Build a TaskSpec wired with fake LLMs, writing outputs to output_dir."""
     config = Config.from_yaml(CONFIG_PATH)
     spec = TaskSpec.from_config(config)
-    shutil.rmtree(output_dir, ignore_errors=True)
     os.makedirs(output_dir, exist_ok=True)
     spec.io["save_path"] = str(output_dir)
 
