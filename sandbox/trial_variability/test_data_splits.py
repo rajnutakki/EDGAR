@@ -63,7 +63,7 @@ def main():
             "Validate": {"init": [], "final": []},
         },
     }
-    for rseed in [42, 43, 44, 45, 46]:
+    for rseed in [11, 22, 33, 44, 55, 66, 77, 88, 99, 101]:
         print(f"\n\n\nScoring for random seed: {rseed}")
         pop = asyncio.run(score_seeds(random_seed=rseed))
         scores["Seed 1"]["Discover"]["init"].append(pop[0].program_losses.discover.init)
@@ -97,6 +97,7 @@ if __name__ == "__main__":
             scores = json.load(f)
 
     # Plot the results
+    plt.figure()
     for seed, splits in scores.items():
         for split, losses in splits.items():
             plt.plot(losses["final"], label=f"{seed} - {split} - Final", marker="o")
