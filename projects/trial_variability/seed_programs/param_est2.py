@@ -1,50 +1,40 @@
 import numpy as np
 
-def parameter_estimator(data):
+def parameter_estimator(data: dict) -> dict:
+    """Computes the optimal PCR projection and weight parameters using least squares.
     """
-    Compute the weight matrix, W_A and W_B, and bias vector, b, for peer prediction model, using reduced rank regression.
-    """
-    responses = data["response"] #(n_trials, n_cells)
+    fixed_rank = 50
+    responses = data["response"]  # (n_trials, n_cells)
     n_trials, n_cells = responses.shape
 
     # Fit only on the first half of trials
     trial_mid = n_trials // 2
-    X = responses[:trial_mid, :n_cells//2] #(n_trials//2, n_source)
-    Y = responses[:trial_mid, n_cells//2:] #(n_trials//2, n_target)
+    X = responses[:trial_mid, :n_cells//2]  # (n_trials//2, n_source)
+    Y = responses[:trial_mid, n_cells//2:]  # (n_trials//2, n_target)
 
-    # Compute the least squares solution for W using the normal equations
+    # Center training data
     X_mean = X.mean(axis=0)
     Y_mean = Y.mean(axis=0)
     X_c = X - X_mean
     Y_c = Y - Y_mean
-    A = X_c.T @ X_c
-    B = X_c.T @ Y_c
-    W_ols = np.linalg.solve(A, B)
 
-    # Perform SVD to reduce rank of W_ols, will generalize better to held-out data.
-    Y_hat = X_c @ W_ols
-    U, S, Vh = np.linalg.svd(Y_hat, full_matrices=False)
-    V = Vh.T
-    fixed_rank = 30
-    r = min(fixed_rank, S.shape[0])
+    # Perform SVD/PCA on centered source cells to find the top 50 principal components
+    U, S, Vh = np.linalg.svd(X_c, full_matrices=False)
+    V = Vh[:fixed_rank, :].T  # (n_source, 50)
 
-    n_source = X.shape[1]
-    n_target = Y.shape[1]
+    # Project the centered source cells into the 50-PC space
+    X_proj = X_c @ V  # (n_trials//2, 50)
 
-    # Initialize low-rank matrices W_A and W_B with zeros
-    W_A = np.zeros((n_source, fixed_rank))
-    W_B = np.zeros((fixed_rank, n_target))
+    # Solve the OLS problem in the PC space (stable)
+    A = X_proj.T @ X_proj
+    B = X_proj.T @ Y_c
+    W = np.linalg.solve(A, B)  # (50, n_target)
 
-    # Populate top r components
-    W_A[:, :r] = W_ols @ V[:, :r]
-    W_B[:r, :] = Vh[:r, :]
-
-    # Compute the intercept using the low-rank reconstructed weight matrix
-    W_lowrank = W_A @ W_B
-    b = Y_mean - X_mean @ W_lowrank #compute the intercept
+    # Compute the intercept using the projected weights
+    b = Y_mean - X_mean @ V @ W
 
     return {
-        "W_A": W_A.astype(float),
-        "W_B": W_B.astype(float),
+        "V": V.astype(float),
+        "W": W.astype(float),
         "b": b.astype(float)
     }
