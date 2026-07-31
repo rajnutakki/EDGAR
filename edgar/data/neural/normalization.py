@@ -19,20 +19,9 @@ def by_vector_norm(response: np.ndarray, axis: int = 0) -> np.ndarray:
     return response / np.linalg.norm(response, axis=axis, keepdims=True)
 
 
-def by_peak(response: np.ndarray, peak_values: np.ndarray) -> np.ndarray:
-    """Normalizes neural responses by their peak values.
-
-    This function divides each response in the `response` array by its corresponding
-    `peak_value`. To prevent division by zero, `peak_values` that are zero are
-    replaced with a small epsilon (1e-10) before division.
-
-    Args:
-        response: The input neural response data, typically a multi-dimensional array.
-        peak_values: A 1D array of peak values, where each element corresponds to
-            the peak of a response in `response`.
-
-    Returns:
-        A new `np.ndarray` with neural responses normalized by their peak values.
+def by_peak(response: np.ndarray, axis: int = 0) -> np.ndarray:
     """
-    safe_peaks = np.where(peak_values == 0, 1e-10, peak_values)
-    return response / safe_peaks[:, np.newaxis]
+    Normalizes neural responses to have a maximum value of 1 along the specified axis.
+    """
+    peaks = np.max(response, axis=axis, keepdims=True)
+    return response / peaks

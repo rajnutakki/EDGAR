@@ -1,7 +1,8 @@
 # run:
 #   random_seed: 42
 io:
-  data_path: "/home/rajah/datasets/BZ015"
+  #data_path: "/home/rajah/datasets/BZ015"
+  data_path: "/home/rajah/datasets/stringer_2021/gratings_drifting_GT1_2019_04_12_1.npy"
   save_path: "/home/rajah/projects/trial_variability/run_output"
 
 evolution:
@@ -23,9 +24,11 @@ llms:
   max_tokens: 20000
 
 scoring:
-  param_penalty_weight: 5e-5
+  param_penalty_weight: 0
 
 project_params:
   activity_thresh: 0.4
   conc_thresh: 0.55
+  normalization_scheme: "peak" #vector / peak
   random_seed: 42 #random_seed for data loading
+  #show_plots: true #if we want to make plots of the data splits
