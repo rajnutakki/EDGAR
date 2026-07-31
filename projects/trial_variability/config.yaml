@@ -15,6 +15,7 @@ evolution:
   #topology: [1, 2, 3, 0]
   critical_population_size: 12
   n_migrants: 2
+  exploit_point: 1
 
 llms:
   num_parents: 2
@@ -24,7 +25,7 @@ llms:
   max_tokens: 20000
 
 scoring:
-  param_penalty_weight: 1e-4
+  param_penalty_weight: 2e-4
 
 project_params:
   activity_thresh: 0.4
