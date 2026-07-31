@@ -1,7 +1,7 @@
 model:
   use_image_feedback: true
   base: 'You are an AI scientist. The {num_parents} programs below are models of V1 neural responses across trials sorted from highest to lowest loss. 
-    Each trial, a grating of a specific orientation is presented as a visual stimulus.
+    Each trial, a drifting grating of a specific orientation is presented as a visual stimulus and neural responses measured via two-photon calcium imaging.
 
     Your task is to create a new model that will better capture the trial-to-trial variability of these responses, resulting in a model with lower loss.
 
@@ -18,6 +18,8 @@ model:
     - data["stimulus"]: The stimulus angle presented at each trial (in radians), shape (n_trials,).
 
     - data["response"]: Neural responses, shape (n_trials, n_cells). In the training data, the bottom-right corner of the response matrix (data["response"][n_trials//2:, n_cells//2:]) is set to NaNs. The rest of the data may be used to generate predictions for the bottom right corner (test data).
+
+    For this dataset, n_trials = 2141, n_cells = 2110.
 
     In order to evaluate the model:
 

@@ -407,4 +407,4 @@ def _filtered_loss_fn(model_output, data, filter):
     total_error = jnp.sum(diff_sq, axis=(-2, -1))
     valid_count = jnp.sum(filter, axis=(-2, -1))
 
-    return 1e5 * total_error / valid_count
+    return 1e4 * total_error / valid_count
