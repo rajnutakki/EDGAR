@@ -1,4 +1,0 @@
-- [x] Use actual peaky tuning curve for seed models (currently missing free angle of second peak).
-- [ ] Update seed model to have guards against numerical instability (e.g small epsilons in denominators)
-- [x] Do better seed parameter estimators for gain/additive components.
-- [ ] Improve image feedback: (tuning curves, trial-wise plots, ... )
