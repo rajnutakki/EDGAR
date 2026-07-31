@@ -33,6 +33,10 @@ model:
     The trials are shuffled so that the order of the trials is arbitrary.
 
     Models are penalized for complexity by adding a term proportional to the number of free parameters to the loss.
+
+    Some ideas you may want to incorporate into your model:
+
+    {ideas-injection-point}
     '
   explore: 'Analyze the strengths and weaknesses of the models shown, using this insight to inspire new and creative model designs which outperform previous ones.
     '
@@ -121,6 +125,13 @@ model:
   - program_losses.discover.final
   - n_params
   - code.model
+
+  ideas:
+    - Stimulus coordinate jitter in the stimulus-driven response, y_t = f(\theta_t + \delta_t).
+    - Dynamically varying stimulus-driven peak widths, heights or sharpness.
+    - Non-linear input modulation, y_t = f(f^{-1}(\theta_t) + ...).
+    - Area-preserving tuning width transformations, y_t = a_t f(a_t \theta_t).
+    - Excitation/Inhibition dynamics, for example with excitatory and inhibitory latents, y_t = W_{E,t} E_t + W_{I,t} I_t, where E_t and I_t are latents.
 
 parameter_estimator:
   base: 'You are an AI scientist. Your task is to create a parameter estimator function to estimate the free parameters of the latest model (shown last below). Also included are previous parent models and their parameter estimators. Your parameter estimator will be used to initialize the parameters of the model before they are optimized by gradient descent, so should aim to minimize the mean-squared error between the model predictions and the responses of the data.

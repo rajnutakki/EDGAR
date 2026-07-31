@@ -19,6 +19,7 @@ evolution:
 
 llms:
   num_parents: 2
+  idea_probability: 0.25
   model_llm: gemini-3.5-flash
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
