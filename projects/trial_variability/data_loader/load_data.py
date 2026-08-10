@@ -32,7 +32,7 @@ def load_data(
         responses_raw, angles_raw = _load_bz015_data(
             data_path
         )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials)
-    elif "stringer" in data_path:
+    elif "GT1_2019_04_12_1" in data_path:
         responses_raw, angles_raw = _load_stringer_data(
             data_path
         )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials)
