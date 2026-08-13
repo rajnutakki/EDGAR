@@ -155,11 +155,6 @@ def plot_model_fits(
     # Determine the model whose prediction is used for sorting the cells
     # We will sort by the last model's predictions (index -1)
     best_model_idx = len(programs) - 1
-    best_model_name = (
-        program_names[best_model_idx]
-        if best_model_idx < len(program_names)
-        else f"Model {best_model_idx + 1}"
-    )
 
     # --- ROW 1: POPULATION FITS (3 trials) ---
     for i, trial_idx in enumerate(random_trials):
@@ -229,7 +224,7 @@ def plot_model_fits(
         ax1.set_ylabel("Response", fontsize=10)
         ax1.tick_params(labelbottom=False, labelsize=9)
 
-        ax2.set_xlabel(f"Cells (sorted by {best_model_name} prediction)", fontsize=10)
+        ax2.set_xlabel("Cells (sorted by best model prediction)", fontsize=10)
         ax2.set_ylabel("Squared Error", fontsize=9)
         ax2.tick_params(labelsize=9)
         if i == 0:
