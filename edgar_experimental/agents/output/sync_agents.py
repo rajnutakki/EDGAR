@@ -40,6 +40,15 @@ color: "blue"
 ---
 """
 
+# Copilot CLI frontmatter
+COPILOT_FRONTMATTER = """---
+name: edgar-analyzer
+description: Analyzes EDGAR run outputs — lists runs, compares model code, and inspects numpy/JAX models and parameter estimators via the edgar_analyzer MCP server. Use when the user wants to study or compare the results of an EDGAR run.
+tools:
+  - edgar_analyzer/*
+---
+"""
+
 
 def sync():
     # Resolve paths relative to repository root
@@ -49,6 +58,7 @@ def sync():
     )
     gemini_path = repo_root / ".gemini/agents/edgar-analyzer.md"
     claude_path = repo_root / ".claude/agents/edgar-analyzer.md"
+    copilot_path = repo_root / ".github/agents/edgar-analyzer.agent.md"
 
     if not instructions_path.exists():
         print(f"Error: Could not find master instructions at {instructions_path}")
@@ -71,11 +81,21 @@ def sync():
     claude_path.write_text(CLAUDE_FRONTMATTER + "\n" + claude_instructions + "\n")
     print(f"Generated Claude Subagent configuration at: {claude_path}")
 
+    # For Copilot CLI, replace custom MCP tool prefix
+    copilot_instructions = instructions.replace(
+        "mcp_edgar_analyzer_", "edgar_analyzer_"
+    )
+
+    # Generate Copilot CLI agent file
+    copilot_path.parent.mkdir(parents=True, exist_ok=True)
+    copilot_path.write_text(COPILOT_FRONTMATTER + "\n" + copilot_instructions + "\n")
+    print(f"Generated Copilot CLI Agent configuration at: {copilot_path}")
+
     # Ensure .mcp.json is correctly configured
     mcp_path = repo_root / ".mcp.json"
     expected_config = {
         "command": "uv",
-        "args": ["run", "python", "agents/output/tools/mcp_server.py"],
+        "args": ["run", "--with", "mcp", "python", "agents/output/tools/mcp_server.py"],
     }
 
     mcp_data = {}
