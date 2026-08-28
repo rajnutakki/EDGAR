@@ -1,0 +1,28 @@
+# Minimal one-VM smoke test for `edgar launch-gcp`.
+# Fill in project_id + bucket, then:
+#   uv run edgar launch-gcp gcp_launch.multi_test.yaml --dry-run   # inspect first
+#   uv run edgar launch-gcp gcp_launch.multi_test.yaml             # launch (real, billable)
+# Uses the synthetic_data project (data_path="" -> no data upload) for 1 generation.
+
+gcp:
+  project_id: gen-lang-client-0389077732           # your GCP project
+  bucket: edgar_deploy               # gsutil ls -p {project_id}
+  zone: europe-west2-a            # gcloud compute accelerator-types list --filter="zone ~ europe-west2", same as bucket
+  gpu_type: nvidia-tesla-t4      # cheapest common GPU, also p4, v100, p100 options 
+  machine_type: n1-standard-4    # T4 pairs with n1-*
+  spot: false                    # spot = true uses preemptible VMs, which are cheaper but can be interrupted
+  max_hours: 24                   # hard cap
+
+runs:
+  # - config: projects/trial_variability/config.yaml
+  #   run_name: trial_variability_test
+  #   overrides:
+  #     evolution.n_generations: 1
+  #     evolution.n_islands: 2
+  #     evolution.batch_size: 1
+  #     evolution.topology: [1, 0]
+
+  - config: projects/trial_variability/config.yaml
+    run_name: trial_variability
+    overrides:
+      scoring.param_penalty_weight: 2e-5
