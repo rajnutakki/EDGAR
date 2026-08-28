@@ -1,0 +1,9 @@
+*.lock
+*.jpeg
+*.png
+*.pdf
+*.ipynb
+pyproject.toml
+README.md
+*__pycache__*
+.claude/sessions/

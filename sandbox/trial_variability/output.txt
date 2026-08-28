@@ -1,0 +1,120 @@
+Loading data from /home/rajah/datasets/stringer_2021/gratings_drifting_GT1_2019_04_12_1.npy...
+Raw responses: (n_repeats = 1, n_trials = 4282, n_cells = 20616)
+Raw angles: (n_repeats = 1, n_trials = 4282)
+Filtered (stacked) responses: (n_trials = 4282, n_cells = 2110)
+Filtered (stacked) angles: (n_trials = 4282)
+Loading data from /home/rajah/datasets/stringer_2021/gratings_drifting_GT1_2019_04_12_1.npy...
+Raw responses: (n_repeats = 1, n_trials = 4282, n_cells = 20616)
+Raw angles: (n_repeats = 1, n_trials = 4282)
+Filtered (stacked) responses: (n_trials = 4282, n_cells = 2110)
+Filtered (stacked) angles: (n_trials = 4282)
+Optimizing program: Seed Model 1
+Epsilon = 0.000000
+  [optimize] Step 241: Non-finite gradient detected!
+  [optimize] Step 242: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 64.3553, Final: 43.9905
+Losses (complexity penalty)- Initial: 70.2757, Final: 49.9109
+Epsilon = 0.010000
+  [optimize] Step 269: Non-finite gradient detected!
+  [optimize] Step 270: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 64.5055, Final: 43.9967
+Losses (complexity penalty)- Initial: 70.4259, Final: 49.9171
+Epsilon = 0.100000
+  [optimize] Step 203: Non-finite gradient detected!
+  [optimize] Step 204: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 72.5281, Final: 46.0988
+Losses (complexity penalty)- Initial: 78.4485, Final: 52.0192
+Epsilon = 0.500000
+  [optimize] Step 72: Non-finite gradient detected!
+  [optimize] Step 73: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 109.2398, Final: 82.7464
+Losses (complexity penalty)- Initial: 115.1602, Final: 88.6668
+Epsilon = 1.000000
+  [optimize] Step 29: Non-finite gradient detected!
+  [optimize] Step 30: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 219.1873, Final: 156.1206
+Losses (complexity penalty)- Initial: 225.1077, Final: 162.0410
+Optimizing program: Seed Model 2
+Epsilon = 0.000000
+Losses (no complexity penalty)- Initial: 35.7661, Final: 35.7661
+Losses (complexity penalty)- Initial: 57.0771, Final: 57.0771
+Epsilon = 0.010000
+Losses (no complexity penalty)- Initial: 35.7725, Final: 35.7656
+Losses (complexity penalty)- Initial: 57.0835, Final: 57.0766
+Epsilon = 0.100000
+Losses (no complexity penalty)- Initial: 36.4938, Final: 35.7721
+Losses (complexity penalty)- Initial: 57.8048, Final: 57.0831
+Epsilon = 0.500000
+Losses (no complexity penalty)- Initial: 55.9944, Final: 36.0494
+Losses (complexity penalty)- Initial: 77.3054, Final: 57.3604
+Epsilon = 1.000000
+Losses (no complexity penalty)- Initial: 112.5076, Final: 36.7411
+Losses (complexity penalty)- Initial: 133.8186, Final: 58.0521
+Optimizing program: Standardized Nonlinear Subspace Modulation Model
+Epsilon = 0.000000
+  [optimize] Step 373: Non-finite gradient detected!
+  [optimize] Step 374: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 54.7965, Final: 38.0923
+Losses (complexity penalty)- Initial: 60.9155, Final: 44.2113
+Epsilon = 0.010000
+  [optimize] Step 397: Non-finite gradient detected!
+  [optimize] Step 398: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 54.9978, Final: 38.3989
+Losses (complexity penalty)- Initial: 61.1168, Final: 44.5179
+Epsilon = 0.100000
+  [optimize] Step 332: Non-finite gradient detected!
+  [optimize] Step 333: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 71.2660, Final: 38.2083
+Losses (complexity penalty)- Initial: 77.3850, Final: 44.3273
+Epsilon = 0.500000
+  [optimize] Step 37: Non-finite gradient detected!
+  [optimize] Step 38: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 138.6730, Final: 65.5423
+Losses (complexity penalty)- Initial: 144.7920, Final: 71.6613
+Epsilon = 1.000000
+  [optimize] Step 22: Non-finite gradient detected!
+  [optimize] Step 23: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 221.1488, Final: 120.9293
+Losses (complexity penalty)- Initial: 227.2678, Final: 127.0483
+Optimizing program: Biophysical Source-Conditioned Multi-Latent Model
+Epsilon = 0.000000
+  [optimize] Step 801: Non-finite gradient detected!
+  [optimize] Step 802: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 108.9432, Final: 39.0820
+Losses (complexity penalty)- Initial: 115.9062, Final: 46.0450
+Epsilon = 0.010000
+  [optimize] Step 392: Non-finite gradient detected!
+  [optimize] Step 393: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 109.0945, Final: 36.7233
+Losses (complexity penalty)- Initial: 116.0575, Final: 43.6863
+Epsilon = 0.100000
+  [optimize] Step 507: Non-finite gradient detected!
+  [optimize] Step 508: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 122.3278, Final: 37.5775
+Losses (complexity penalty)- Initial: 129.2908, Final: 44.5405
+Epsilon = 0.500000
+  [optimize] Step 23: Non-finite gradient detected!
+  [optimize] Step 24: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 1112.5127, Final: 292.8742
+Losses (complexity penalty)- Initial: 1119.4757, Final: 299.8372
+Epsilon = 1.000000
+  [optimize] Step 64: Non-finite gradient detected!
+  [optimize] Step 65: Non-finite loss nan, breaking.
+Losses (no complexity penalty)- Initial: 24066.6836, Final: 756.0727
+Losses (complexity penalty)- Initial: 24073.6466, Final: 763.0357
+Optimizing program: Double Von Mises Tuning with Shared-Latent Softplus Feedback Model
+Epsilon = 0.000000
+Losses (no complexity penalty)- Initial: 202.6151, Final: 36.3132
+Losses (complexity penalty)- Initial: 210.8461, Final: 44.5442
+Epsilon = 0.010000
+Losses (no complexity penalty)- Initial: 202.5548, Final: 36.2892
+Losses (complexity penalty)- Initial: 210.7858, Final: 44.5202
+Epsilon = 0.100000
+Losses (no complexity penalty)- Initial: 205.5128, Final: 36.3306
+Losses (complexity penalty)- Initial: 213.7438, Final: 44.5616
+Epsilon = 0.500000
+Losses (no complexity penalty)- Initial: 264.0479, Final: 37.1064
+Losses (complexity penalty)- Initial: 272.2789, Final: 45.3374
+Epsilon = 1.000000
+Losses (no complexity penalty)- Initial: 419.8303, Final: 39.5436
+Losses (complexity penalty)- Initial: 428.0613, Final: 47.7746
