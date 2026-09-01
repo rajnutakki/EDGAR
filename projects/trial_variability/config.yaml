@@ -26,7 +26,11 @@ llms:
   max_tokens: 20000
 
 scoring:
+  # Number of parameter estimators to generate and optimize per program
+  n_param_ests: 1
   param_penalty_weight: 2e-4
+    # Banned substrings in jax-translated models. If present, program gets infinite loss & banned status.
+  banned_strings: ["linalg.solve"]
 
 project_params:
   activity_thresh: 0.4
