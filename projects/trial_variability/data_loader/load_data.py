@@ -29,13 +29,13 @@ def load_data(
     """
     print(f"Loading data from {data_path}...")
     if "BZ015" in data_path:
-        responses_raw, angles_raw = _load_bz015_data(
+        responses_raw, angles_raw, times_raw = _load_bz015_data(
             data_path
-        )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials)
+        )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials), (n_repeats, n_trials)
     elif "GT1_2019_04_12_1" in data_path:
-        responses_raw, angles_raw = _load_stringer_data(
+        responses_raw, angles_raw, times_raw = _load_stringer_data(
             data_path
-        )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials)
+        )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials), (n_repeats, n_trials)
     else:
         raise ValueError(
             f"Unrecognized dataset in path: {data_path}, must contain 'BZ015' or 'stringer'"
@@ -47,6 +47,9 @@ def load_data(
     print(
         f"Raw angles: (n_repeats = {len(angles_raw)}, n_trials = {angles_raw[0].shape[0]})"
     )
+    print(
+        f"Raw times: (n_repeats = {len(times_raw)}, n_trials = {times_raw[0].shape[0]})"
+    )
     responses_filtered = _filter_cells(
         responses_raw, angles_raw, activity_thresh, conc_thresh
     )
@@ -54,10 +57,12 @@ def load_data(
     # 2. Normalize, (optionally shuffle), partition
     resp_all = np.vstack(responses_filtered)
     ang_all = np.concatenate(angles_raw)
+    time_all = np.concatenate(times_raw)
     print(
         f"Filtered (stacked) responses: (n_trials = {resp_all.shape[0]}, n_cells = {resp_all.shape[1]})"
     )
     print(f"Filtered (stacked) angles: (n_trials = {ang_all.shape[0]})")
+    print(f"Filtered (stacked) times: (n_trials = {time_all.shape[0]})")
     if resp_all.shape[0] // 2 < resp_all.shape[1]:
         warnings.warn(
             f"Number of trials per partition ({resp_all.shape[0] // 2}) is less than number of cells ({resp_all.shape[1]}). This may lead to problems with peer prediction as "
@@ -74,23 +79,36 @@ def load_data(
         shuffled_idx = rng.permutation(len(resp_all))
         resp_all = resp_all[shuffled_idx]
         ang_all = ang_all[shuffled_idx]
+        time_all = time_all[shuffled_idx]
 
     # Partition back into discovery and validation using a 50/50 split of the trials
     n_disc = len(resp_all) // 2
     resp_disc = resp_all[:n_disc]
     ang_disc = ang_all[:n_disc]
+    time_disc = time_all[:n_disc]
     resp_val = resp_all[n_disc:]
     ang_val = ang_all[n_disc:]
+    time_val = time_all[n_disc:]
 
     # 3. Calculate Signal (Tuning Curves)
     sig_disc, bin_centers, avg_resp_disc = _get_signal(resp_disc, ang_disc, n_bins)
     sig_val, _, avg_resp_val = _get_signal(resp_val, ang_val, n_bins)
 
     # 4. Masking out of bottom right for train data
-    disc_train = _apply_corner_mask(resp_disc, sig_disc, ang_disc)
-    disc_test = {"response": resp_disc, "signal": sig_disc, "stimulus": ang_disc}
-    val_train = _apply_corner_mask(resp_val, sig_val, ang_val)
-    val_test = {"response": resp_val, "signal": sig_val, "stimulus": ang_val}
+    disc_train = _apply_corner_mask(resp_disc, sig_disc, ang_disc, time_disc)
+    disc_test = {
+        "response": resp_disc,
+        "signal": sig_disc,
+        "stimulus": ang_disc,
+        "time": time_disc,
+    }
+    val_train = _apply_corner_mask(resp_val, sig_val, ang_val, time_val)
+    val_test = {
+        "response": resp_val,
+        "signal": sig_val,
+        "stimulus": ang_val,
+        "time": time_val,
+    }
 
     # 5. Add Sample Dimension to ALL fields
     for d in [disc_train, disc_test, val_train, val_test]:
@@ -123,15 +141,20 @@ def _to_jax(d: dict) -> dict:
     return {k: jnp.array(v) if isinstance(v, np.ndarray) else v for k, v in d.items()}
 
 
-def _load_stringer_data(data_path: str) -> tuple[list[np.ndarray], list[np.ndarray]]:
+def _load_stringer_data(
+    data_path: str,
+) -> tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
     data = np.load(data_path, allow_pickle=True).item()
     responses_raw = extract_stimulus_related(data, n_pcs=0)  # (n_cells, n_trials)
     responses_raw = responses_raw.T  # (n_trials, n_cells)
     angles_raw = data["istim"]  # (n_trials,)
-    return [responses_raw], [angles_raw]
+    times_raw = data["stimtimes"]  # (n_trials,)
+    return [responses_raw], [angles_raw], [times_raw]
 
 
-def _load_bz015_data(data_path: str) -> tuple[list[np.ndarray], list[np.ndarray]]:
+def _load_bz015_data(
+    data_path: str,
+) -> tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
     """Load BZ015 neural responses and stimulus angles from files."""
     _temp_dir = None
     # If a tarball is provided, extract it to a temporary directory and load from that (used with gcp)
@@ -159,38 +182,40 @@ def _load_bz015_data(data_path: str) -> tuple[list[np.ndarray], list[np.ndarray]
                 data_path + "/BZ015_2025-07-03_5/2025-07-03_5_BZ015_Block.mat",
             ),
         )
-        responses_raw, angles_raw = _load_raw_bz015_data(
+        responses_raw, angles_raw, times_raw = _load_raw_bz015_data(
             data_paths
-        )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials)
+        )  # (n_repeats, n_trials, n_cells), (n_repeats, n_trials), (n_repeats, n_trials)
     finally:  # ensure this runs even if an exception is raised, ensuring temp files are cleaned up
         if _temp_dir is not None:
             _temp_dir.cleanup()
-    return responses_raw, angles_raw
+    return responses_raw, angles_raw, times_raw
 
 
 def _load_raw_bz015_data(
     data_paths: tuple[tuple[str, str], ...],
-) -> tuple[list[np.ndarray], list[np.ndarray]]:
+) -> tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
     """Load neural responses and stimulus angles from files."""
-    responses, angles = [], []
+    responses, angles, times = [], [], []
     for d_file, m_file in data_paths:
         resp = np.load(d_file)  # (n_trials, n_cells)
         mat_data = sp.io.loadmat(m_file, simplify_cells=True)
         ang = np.array(
             [entry["gratingOrient"] for entry in mat_data["block"]["paramsValues"]]
         )
+        tim = np.array(mat_data["block"]["paramsTimes"])
 
         # Filter out invalid stimulus values
         mask = ang != 1
         responses.append(resp[mask])
         angles.append(ang[mask])
+        times.append(tim[mask])
 
     # Convert angles to radians and ensure they are within [0, 2*pi)
     for i in range(len(angles)):
         angles[i] = np.deg2rad(angles[i])
         angles[i][angles[i] >= 2 * np.pi] = 2 * np.pi - 1e-5
 
-    return responses, angles
+    return responses, angles, times
 
 
 def _filter_cells(
@@ -228,7 +253,9 @@ def _get_signal(
     return sig_all, bin_centers, avg_resp
 
 
-def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray):
+def _apply_corner_mask(
+    resp: np.ndarray, sig: np.ndarray, ang: np.ndarray, time: np.ndarray
+):
     """Create train data by masking the bottom-right corner of the response matrix."""
     n_trials, n_cells = resp.shape
     trial_mid, cell_mid = n_trials // 2, n_cells // 2
@@ -240,7 +267,7 @@ def _apply_corner_mask(resp: np.ndarray, sig: np.ndarray, ang: np.ndarray):
     sig_train = sig.copy()
     sig_train[trial_mid:, cell_mid:] = 0.0
 
-    return {"response": resp_train, "signal": sig_train, "stimulus": ang}
+    return {"response": resp_train, "signal": sig_train, "stimulus": ang, "time": time}
 
 
 def _plot_partitions(disc_train, disc_test, val_train, val_test):
