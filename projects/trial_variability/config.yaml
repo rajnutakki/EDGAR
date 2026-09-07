@@ -4,6 +4,7 @@ io:
   #data_path: "/home/rajah/datasets/BZ015"
   data_path: "/home/rajah/datasets/stringer_2021/gratings_drifting_GT1_2019_04_12_1.npy"
   save_path: "/home/rajah/projects/trial_variability/run_output"
+  save_trajectories: true
 
 evolution:
   #n_generations: 12
@@ -20,14 +21,15 @@ evolution:
 llms:
   num_parents: 2
   idea_probability: 0.25
-  model_llm: gemini-3.5-flash
+  model_llm: gemini-3.6-flash
+  param_est_llm: gemini-3.6-flash
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
   max_tokens: 20000
 
 scoring:
   # Number of parameter estimators to generate and optimize per program
-  n_param_ests: 1
+  n_param_ests: 5
   param_penalty_weight: 2e-4
     # Banned substrings in jax-translated models. If present, program gets infinite loss & banned status.
   banned_strings: ["linalg.solve"]
