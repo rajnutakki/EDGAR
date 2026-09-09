@@ -23,6 +23,7 @@ llms:
   idea_probability: 0.25
   model_llm: gemini-3.6-flash
   param_est_llm: gemini-3.6-flash
+  jax_model_translator_llm: gemini-3.1-flash-lite
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
   max_tokens: 20000
@@ -30,7 +31,7 @@ llms:
 scoring:
   # Number of parameter estimators to generate and optimize per program
   n_param_ests: 5
-  param_penalty_weight: 2e-4
+  param_penalty_weight: 2e-5
     # Banned substrings in jax-translated models. If present, program gets infinite loss & banned status.
   banned_strings: ["linalg.solve"]
 
