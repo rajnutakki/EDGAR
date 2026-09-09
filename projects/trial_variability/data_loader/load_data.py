@@ -130,15 +130,10 @@ def load_data(
         )
 
     return (
-        (_to_jax(disc_train), _to_jax(disc_test)),
-        (_to_jax(val_train), _to_jax(val_test)),
-        _to_jax(eval_data),
+        (disc_train, disc_test),
+        (val_train, val_test),
+        eval_data,
     )
-
-
-def _to_jax(d: dict) -> dict:
-    """Recursively convert numpy arrays in a dictionary to JAX arrays."""
-    return {k: jnp.array(v) if isinstance(v, np.ndarray) else v for k, v in d.items()}
 
 
 def _load_stringer_data(
