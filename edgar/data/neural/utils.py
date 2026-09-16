@@ -1,4 +1,4 @@
-"""Utilities for handling neural data trials.
+"""Utilities for handling neural data
 
 This module provides functions for manipulating experimental trial data,
 specifically for shuffling multiple arrays consistently along a specified axis.
@@ -35,3 +35,13 @@ def shuffle(*arrays: np.ndarray, axis: int = -1) -> list[np.ndarray]:
     return [
         np.take(arr, shuff_idx, axis=axis) if arr.ndim > 0 else arr for arr in arrays
     ]
+
+
+def bin_x(x: np.ndarray, n_bins: int, min_val: float, max_val: float) -> np.ndarray:
+    """
+    Bins the input array `x` into `n_bins` equal-width bins between `min_val` and `max_val`.
+    """
+    bin_edges = np.linspace(min_val, max_val, n_bins + 1)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_indices = np.digitize(x, bin_edges) - 1
+    return bin_centers[bin_indices]
