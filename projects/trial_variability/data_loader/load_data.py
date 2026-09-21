@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 import jax.numpy as jnp
-from edgar.data.neural import filtering, normalization, signal
+from edgar.data.neural import filtering, normalization
+from edgar.data.neural.utils import bin_x
 from edgar.data.neural.signal import extract_stimulus_related
-
 
 def load_data(
     data_path: str,
@@ -81,32 +81,47 @@ def load_data(
         ang_all = ang_all[shuffled_idx]
         time_all = time_all[shuffled_idx]
 
-    # Partition back into discovery and validation using a 50/50 split of the trials
-    n_disc = len(resp_all) // 2
-    resp_disc = resp_all[:n_disc]
-    ang_disc = ang_all[:n_disc]
-    time_disc = time_all[:n_disc]
-    resp_val = resp_all[n_disc:]
-    ang_val = ang_all[n_disc:]
-    time_val = time_all[n_disc:]
+    # 3. Bin the angles
+    binned_angs = bin_x(ang_all, n_bins, 0, 2*np.pi)
+    _, bin_count = np.unique(binned_angs, return_counts=True)
+    print(f"All data: min trials per bin = {bin_count.min()}, max trials per bin = {bin_count.max()}")
 
-    # 3. Calculate Signal (Tuning Curves)
-    sig_disc, bin_centers, avg_resp_disc = _get_signal(resp_disc, ang_disc, n_bins)
-    sig_val, _, avg_resp_val = _get_signal(resp_val, ang_val, n_bins)
+    # 4. Partition into discovery and validation using alternating bins in order of angle
+    unique_bins = np.sort(np.unique(binned_angs))
+    disc_bins = unique_bins[::2]
+    val_bins = unique_bins[1::2]
+
+    is_disc = np.isin(binned_angs, disc_bins)
+    is_val = np.isin(binned_angs, val_bins)
+
+    resp_disc = resp_all[is_disc]
+    time_disc = time_all[is_disc]
+    binned_ang_disc = binned_angs[is_disc]
+    resp_val = resp_all[is_val]
+    time_val = time_all[is_val]
+    binned_ang_val = binned_angs[is_val]
 
     # 4. Masking out of bottom right for train data
-    disc_train = _apply_corner_mask(resp_disc, sig_disc, ang_disc, time_disc)
-    disc_test = {
-        "response": resp_disc,
-        "signal": sig_disc,
-        "stimulus": ang_disc,
+    resp_disc_train = _apply_corner_mask(resp_disc)
+    disc_train = {
+        "response": resp_disc_train,
+        "stimulus": binned_ang_disc,
         "time": time_disc,
     }
-    val_train = _apply_corner_mask(resp_val, sig_val, ang_val, time_val)
+    disc_test = {
+        "response": resp_disc,
+        "stimulus": binned_ang_disc,
+        "time": time_disc,
+    }
+    resp_val_train = _apply_corner_mask(resp_val)
+    val_train = {
+        "response": resp_val_train,
+        "stimulus": binned_ang_val,
+        "time": time_val,
+    }
     val_test = {
         "response": resp_val,
-        "signal": sig_val,
-        "stimulus": ang_val,
+        "stimulus": binned_ang_val,
         "time": time_val,
     }
 
@@ -121,13 +136,13 @@ def load_data(
 
     if show_plots:
         _plot_partitions(disc_train, disc_test, val_train, val_test)
-        _plot_tuning_verification(
-            np.vstack([resp_disc, resp_val]),
-            np.concatenate([ang_disc, ang_val]),
-            bin_centers,
-            avg_resp_disc,
-            random_seed,
-        )
+        # _plot_tuning_verification(
+        #     np.vstack([resp_disc, resp_val]),
+        #     np.concatenate([ang_disc, ang_val]),
+        #     bin_centers,
+        #     avg_resp_disc,
+        #     random_seed,
+        # )
 
     return (
         (disc_train, disc_test),
@@ -229,41 +244,16 @@ def _filter_cells(
     good_cells_mask = (conc > conc_thresh) & (activity > activity_thresh)
     return [r[:, good_cells_mask] for r in responses_list]
 
-
-def _get_signal(
-    resp: np.ndarray, ang: np.ndarray, n_bins: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Calculate the binned mean signal (tuning curves) using only train trials to prevent data leakage."""
-    bin_edges = np.linspace(0, 2 * np.pi, n_bins + 1)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    # Fit binned tuning curves using ONLY the first-half training trials
-    trial_mid = len(resp) // 2
-    avg_resp = signal.binned_mean(ang[:trial_mid], resp[:trial_mid].T, bin_centers)
-
-    # Map these train-only tuning curves back to ALL trials of this partition
-    _, bin_indices = signal.binned_mean(ang, resp.T, bin_centers, return_indices=True)
-    sig_all = avg_resp[:, bin_indices].T
-
-    return sig_all, bin_centers, avg_resp
-
-
 def _apply_corner_mask(
-    resp: np.ndarray, sig: np.ndarray, ang: np.ndarray, time: np.ndarray
+    resp: np.ndarray,
 ):
     """Create train data by masking the bottom-right corner of the response matrix."""
     n_trials, n_cells = resp.shape
     trial_mid, cell_mid = n_trials // 2, n_cells // 2
-
     # Train: Mask out bottom right corner
     resp_train = resp.copy()
     resp_train[trial_mid:, cell_mid:] = np.nan
-    # Use 0.0 for signal to avoid NaN gradients during optimization
-    sig_train = sig.copy()
-    sig_train[trial_mid:, cell_mid:] = 0.0
-
-    return {"response": resp_train, "signal": sig_train, "stimulus": ang, "time": time}
-
+    return resp_train
 
 def _plot_partitions(disc_train, disc_test, val_train, val_test):
     # Set up 2 rows and 4 columns
@@ -291,25 +281,23 @@ def _plot_partitions(disc_train, disc_test, val_train, val_test):
 
     # --- SORTED PLOTS ---
     # Compute sorting indices for Discovery from disc_test
-    # disc_resp_test = disc_test["response"][0]
-    disc_sig_test = disc_test["signal"][0]
+    disc_resp_test = disc_test["response"][0]
     disc_stims_test = disc_test["stimulus"][0]
 
     trial_sort_disc = np.argsort(disc_stims_test)
     complex_sum_disc = np.nansum(
-        disc_sig_test * np.exp(1j * disc_stims_test)[:, np.newaxis], axis=0
+        disc_resp_test * np.exp(1j * disc_stims_test)[:, np.newaxis], axis=0
     )
     pref_angles_disc = np.angle(complex_sum_disc) % (2 * np.pi)
     cell_sort_disc = np.argsort(pref_angles_disc)
 
     # Compute sorting indices for Validation from val_test
-    # val_resp_test = val_test["response"][0]
-    val_sig_test = val_test["signal"][0]
+    val_resp_test = val_test["response"][0]
     val_stims_test = val_test["stimulus"][0]
 
     trial_sort_val = np.argsort(val_stims_test)
     complex_sum_val = np.nansum(
-        val_sig_test * np.exp(1j * val_stims_test)[:, np.newaxis], axis=0
+        val_resp_test * np.exp(1j * val_stims_test)[:, np.newaxis], axis=0
     )
     pref_angles_val = np.angle(complex_sum_val) % (2 * np.pi)
     cell_sort_val = np.argsort(pref_angles_val)
