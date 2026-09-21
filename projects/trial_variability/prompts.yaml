@@ -117,6 +117,14 @@ model:
 
     number of free parameters: {n_params}
 
+    overall R^2: {diagnostics_r2_overall}
+
+    signal R^2: {diagnostics_r2_signal}
+
+    noise R^2: {diagnostics_r2_noise}
+
+    fano slope (pred vs data): {diagnostics_fano_slope_pred} (data: {diagnostics_fano_slope_data})
+
     {code_model}
 
     '
@@ -124,6 +132,11 @@ model:
   - name
   - program_losses.discover.final
   - n_params
+  - diagnostics.r2_overall
+  - diagnostics.r2_signal
+  - diagnostics.r2_noise
+  - diagnostics.fano_slope_pred
+  - diagnostics.fano_slope_data
   - code.model
 
   ideas:
