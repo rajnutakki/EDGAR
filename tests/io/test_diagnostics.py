@@ -3,7 +3,8 @@ from edgar.projects.diagnostics import BaseDiagnostics
 from edgar.evolution.program import Program, BirthCertificate
 from edgar.evolution.population import Population
 from edgar.llm.prompt_schema import PromptSchema, _get_nested_attr
-
+from edgar.io.config import Config
+from edgar.io.task_spec import TaskSpec
 
 def test_base_diagnostics_defaults():
     diag = BaseDiagnostics()
@@ -31,6 +32,28 @@ def test_prompt_schema_nested_dict_attr():
     prompt = schema.build_prompt("explore", parent_programs=[program])
     assert "R2=0.85" in prompt
 
+def test_trial_variability_diagnostics_loading():
+    config = Config.from_yaml("projects/trial_variability/config.yaml")
+    spec = TaskSpec.from_config(config)
+
+    assert spec.diagnostics is not None
+    assert hasattr(spec.diagnostics, "compute_metrics")
+    assert hasattr(spec.diagnostics, "plot_model_fits")
+
+    n_trials = 20
+    n_cells = 10
+    stim = np.linspace(0, np.pi, n_trials)
+    resp = np.ones((n_trials, n_cells))
+    data = {"stimulus": stim, "response": resp}
+    pred = np.ones((n_trials, n_cells)) * 0.9
+
+    metrics = spec.diagnostics.compute_metrics(data, pred)
+
+    assert "r2_overall" in metrics
+    assert "r2_signal" in metrics
+    assert "r2_noise" in metrics
+    assert "fano_slope_data" in metrics
+    assert "fano_slope_pred" in metrics
 
 def test_population_save_load_diagnostics(tmp_path):
     pop = Population()
