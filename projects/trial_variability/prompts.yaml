@@ -113,31 +113,21 @@ model:
 
   parent_program_template: '**Model: {name}**
 
-    loss: {program_losses_discover_final}
+    loss: {program_losses.discover.final}
 
     number of free parameters: {n_params}
 
-    overall R^2: {diagnostics_r2_overall}
+    overall R^2: {diagnostics.r2_overall}
 
-    signal R^2: {diagnostics_r2_signal}
+    signal R^2: {diagnostics.r2_signal}
 
-    noise R^2: {diagnostics_r2_noise}
+    noise R^2: {diagnostics.r2_noise}
 
-    fano slope (pred vs data): {diagnostics_fano_slope_pred} (data: {diagnostics_fano_slope_data})
+    fano slope (pred vs data): {diagnostics.fano_slope_pred} (data: {diagnostics.fano_slope_data})
 
-    {code_model}
+    {code.model}
 
     '
-  parent_program_vars:
-  - name
-  - program_losses.discover.final
-  - n_params
-  - diagnostics.r2_overall
-  - diagnostics.r2_signal
-  - diagnostics.r2_noise
-  - diagnostics.fano_slope_pred
-  - diagnostics.fano_slope_data
-  - code.model
 
   ideas:
     - Stimulus coordinate jitter in the stimulus-driven response, y_t = f(\theta_t + \delta_t).
@@ -195,25 +185,17 @@ parameter_estimator:
   image_analysis_instructions: null
   parent_program_template: |
     **Parent model: {name}**
-    loss: {program_losses_discover_final}
+    loss: {program_losses.discover.final}
     model:
-    {model_code}
+    {code.model}
     parameter_estimator:
-    {param_est_code}
+    {code.best_param_est}
 
     ----------
-  parent_program_vars:
-  - name
-  - program_losses.discover.final
-  - model_code
-  - param_est_code
   current_program_template: |
     **New model: {name}**
-    {model_code}
+    {code.model}
     -----------
-  current_program_vars:
-  - name
-  - model_code
 
 jax_translator_model:
   base: '
@@ -253,12 +235,9 @@ jax_translator_model:
     '
   image_analysis_instructions: null
   parent_program_template: ''
-  parent_program_vars: []
   current_program_template: 'Model code:
 
-    {code_model}
+    {code.model}
 
     '
-  current_program_vars:
-  - code.model
 
