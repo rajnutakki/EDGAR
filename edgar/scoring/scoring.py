@@ -317,9 +317,8 @@ def _worker(
             diagnostics = cloudpickle.loads(diagnostics_bytes)
             if diagnostics is not None and hasattr(diagnostics, "compute_metrics"):
                 y_pred = _to_numpy(_evaluate_model_output(model_fn, params, data_test))
-                data_test_np = _to_numpy(data_test)
                 computed = diagnostics.compute_metrics(
-                    data=data_test_np,
+                    data=_to_numpy(data_test),
                     y_pred=y_pred,
                     params=_to_numpy(params),
                     program=program,
@@ -431,11 +430,11 @@ def _score_one_model(
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            None,
             {},
-            None,
-            None,
-            None,
-            None,
             "inf",
         )
     if _is_banned(config.get("banned_strings", []), program):
@@ -447,11 +446,11 @@ def _score_one_model(
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            None,
             {},
-            None,
-            None,
-            None,
-            None,
             "banned",
         )
 
@@ -490,11 +489,11 @@ def _score_one_model(
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            None,
             {},
-            None,
-            None,
-            None,
-            None,
             "timeout",
         )
     proc.join()
@@ -523,11 +522,11 @@ def _score_one_model(
         _to_numpy(samples) if samples is not None else None,
         _to_numpy(params_init) if params_init is not None else None,
         _to_numpy(samples_init) if samples_init is not None else None,
-        diagnostics_metrics,
         all_final,
         all_init,
         best_idx,
         trajectories,
+        diagnostics_metrics,
         outcome,
     )
 
@@ -632,11 +631,11 @@ def score(
             sample_losses,
             params_init,
             sample_losses_init,
-            diagnostics_metrics,
             all_final,
             all_init,
             best_idx,
             trajectories,
+            diagnostics_metrics,
             outcome,
         ) = _score_one_model(
             program, X_split, loss_fn, config, X_eval, split, diagnostics=diagnostics

@@ -31,7 +31,7 @@ llms:
 scoring:
   # Number of parameter estimators to generate and optimize per program
   n_param_ests: 5
-  param_penalty_weight: 2e-5
+  param_penalty_weight: 0
     # Banned substrings in jax-translated models. If present, program gets infinite loss & banned status.
   banned_strings: ["linalg.solve"]
 

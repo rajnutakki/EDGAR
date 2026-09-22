@@ -299,7 +299,7 @@ async def run(
                 spec.scoring,
                 spec.loss_fn,
                 split="validate",
-                diagnostics=spec.diagnostics,
+                diagnostics=None,
             )
             rank(population)
             metrics.finish_generation()
