@@ -21,9 +21,9 @@ evolution:
 llms:
   num_parents: 2
   idea_probability: 0.25
-  model_llm: gemini-3.6-flash
-  param_est_llm: gemini-3.6-flash
-  jax_model_translator_llm: gemini-3.1-flash-lite
+  model_llm: gemini-3.7-flash
+  param_est_llm: gemini-3.7-flash
+  jax_model_translator_llm: gemini-3.5-flash-lite
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
   max_tokens: 20000
@@ -31,7 +31,7 @@ llms:
 scoring:
   # Number of parameter estimators to generate and optimize per program
   n_param_ests: 5
-  param_penalty_weight: 0
+  param_penalty_weight: 1e-4
     # Banned substrings in jax-translated models. If present, program gets infinite loss & banned status.
   banned_strings: ["linalg.solve"]
 
@@ -40,4 +40,6 @@ project_params:
   conc_thresh: 0.55
   normalization_scheme: "peak" #vector / peak
   random_seed: 42 #random_seed for data loading
+  n_bins: 256 #number of bins for stimulus angles
+  shuffle_trials: true #whether to shuffle trials before splitting into train/test
   #show_plots: true #if we want to make plots of the data splits
