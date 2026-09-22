@@ -1,7 +1,7 @@
 model:
   use_image_feedback: true
   base: 'You are an AI scientist. The {num_parents} programs below are models of V1 neural responses across trials sorted from highest to lowest loss. 
-    Each trial, a drifting grating of a specific orientation is presented as a visual stimulus and neural responses measured via two-photon calcium imaging.
+    Each trial, a drifting grating of one of 256 random orientations is presented as a visual stimulus and neural responses measured via two-photon calcium imaging.
 
     Your task is to create a new model that will better capture the trial-to-trial variability of these responses, resulting in a model with lower loss.
 
@@ -19,7 +19,7 @@ model:
 
     - data["response"]: Neural responses, shape (n_trials, n_cells). In the training data, the bottom-right corner of the response matrix (data["response"][n_trials//2:, n_cells//2:]) is set to NaNs. The rest of the data may be used to generate predictions for the bottom right corner (test data).
 
-    For this dataset, n_trials = 2141, n_cells = 2110.
+    For this dataset, n_trials and n_cells are both approximately 2000.
 
     In order to evaluate the model:
 
@@ -32,9 +32,15 @@ model:
     The model always generates output of shape (n_trials, n_cells), with the loss for optimization / evaluation only calculated from the corresponding train / test part.
     The trials are shuffled so that the order of the trials is arbitrary.
 
-    Models are penalized for complexity by adding a term proportional to the number of free parameters to the loss.
+    Models are presented along with the following metrics:
+    - Loss: (Scaled) Mean squared error between the model predictions and the actual responses for the test dataset + a complexity penalty.
+    - Number of free parameters: The number of free parameters in the model, used to calculate the complexity penalty in the loss.
+    - Overall R^2: Variance of responses explained by the model.
+    - Signal R^2: Variance of responses explained by the signal component of the model, estimated by averaging predictions over repeats of the same stimulus.
+    - Noise R^2: Variance of noise in the responses explained by the noise component of the model, estimated by subtracting the signal component from the data and predictions.
+    - Fano slopes: The scaling of variance over repeats of the same stimulus with the mean response over repeats, for both model predictions and the actual data.
 
-    Some ideas you may want to incorporate into your model:
+    Some ideas you may want to incorporate into your new model:
 
     {ideas-injection-point}
     '
@@ -91,19 +97,14 @@ model:
 
     Use the provided plots to help analyze the models shown.
 
-    In all plots, in the top panel, the actual responses (colored dots) are shown with predictions
-    (colored lines, orange for worst average fit, blue for best). 
+    In all plots. blue points/curves correspond to the worst model (highest loss) and orange points/curves correspond to the best model (lowest loss).
+    Also shown, in purple, are results from the data with private noise removed.
 
-    The bottom panels show the corresponding Squared Error, `(y_pred - y_model)**2`, between the actual responses and 
-    model predictions.
+    1. Tuning curves for three specific cells (rows). 
 
-    The plots are organized as follows:
+    2. Responses for repeats with the same stimulus angles, each point is the response of a cell. The line y = x is shown as a dotted line. `r` is the Pearson correlation across cells.
 
-    Top: Responses from specific trials, with cells sorted by their predicted response from the best model on the x-axis. The colormap of the dots indicates the difference in orientation 
-    between the presented stimulus on this trial and the preferred orientation of the cell.
-
-    Bottom: Responses from specific cells, with trials on the x-axis sorted by stimulus angle, showing the tuning curve of the cell with trial-by-trial variability. The colormap of the dots
-    indicates the density of points in the plot. 
+    3. Noise of different cotuned cells across all trials. The noise is computed for each trial by subtracting the mean response of the cell over repeats of the same stimulus. The line y = x is shown as a dotted line. `r` is the Pearson correlation of these residual fluctuations across all trials.
 
     Analyze where the models fail to capture the actual responses and identify patterns in the errors across plots. For example, does the model consistently under/over predict trials or cells with large/small responses? How could you modify the model to better capture these trial or cell-specific variations?
     Do you need to introduce additional free parameters or can you modify existing ones?
@@ -113,17 +114,17 @@ model:
 
   parent_program_template: '**Model: {name}**
 
-    loss: {program_losses.discover.final}
+    Loss: {program_losses.discover.final}
 
-    number of free parameters: {n_params}
+    Number of free parameters: {n_params}
 
-    overall R^2: {diagnostics.r2_overall}
+    Overall R^2: {diagnostics.r2_overall}
 
-    signal R^2: {diagnostics.r2_signal}
+    Signal R^2: {diagnostics.r2_signal}
 
-    noise R^2: {diagnostics.r2_noise}
+    Noise R^2: {diagnostics.r2_noise}
 
-    fano slope (pred vs data): {diagnostics.fano_slope_pred} (data: {diagnostics.fano_slope_data})
+    Fano slope (pred vs data): {diagnostics.fano_slope_pred} (data: {diagnostics.fano_slope_data})
 
     {code.model}
 

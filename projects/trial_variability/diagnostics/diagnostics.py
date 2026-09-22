@@ -492,8 +492,8 @@ class Diagnostics(BaseDiagnostics):
         axes1 = outer_subfigs[0].subplots(3, 2)
         rows_info_tc = [
             (cell_12, f"{name1} vs {name2}"),
-            (cell_1rrr, f"{name1} vs RRR"),
-            (cell_2rrr, f"{name2} vs RRR"),
+            (cell_1rrr, f"{name1} vs Data"),
+            (cell_2rrr, f"{name2} vs Data"),
         ]
 
         angles_x = folded_angles[0, :]
@@ -550,12 +550,12 @@ class Diagnostics(BaseDiagnostics):
                     max_rrr,
                     color="C4",
                     alpha=0.12,
-                    label=lbl("RRR Envelope"),
+                    label=lbl("Data Envelope"),
                     zorder=2,
                 )
 
                 ax.set_title(
-                    f"Max Disagreement: {comp_name} (Cell {cell_idx})\n{model_name} vs RRR",
+                    f"Max Disagreement: {comp_name} (Cell {cell_idx})\n{model_name} vs Data",
                     fontsize=10,
                 )
                 ax.set_xlabel("Stimulus Angle (rad)", fontsize=9)
@@ -575,8 +575,8 @@ class Diagnostics(BaseDiagnostics):
         row_subfigs2 = outer_subfigs[1].subfigures(3, 1)
         rows_info_rep = [
             (angle_12, r1_12, r2_12, f"{name1} vs {name2}"),
-            (angle_1rrr, r1_1rrr, r2_1rrr, f"{name1} vs RRR"),
-            (angle_2rrr, r1_2rrr, r2_2rrr, f"{name2} vs RRR"),
+            (angle_1rrr, r1_1rrr, r2_1rrr, f"{name1} vs Data"),
+            (angle_2rrr, r1_2rrr, r2_2rrr, f"{name2} vs Data"),
         ]
 
         for row_idx, (top_angle_idx, r1, r2, comp_name) in enumerate(rows_info_rep):
@@ -590,7 +590,7 @@ class Diagnostics(BaseDiagnostics):
             ax_row = subfig.subplots(1, 3)
 
             cols_config = [
-                (folded_rrr, "C4", "RRR", f"Response repeat {r2}"),
+                (folded_rrr, "C4", "Data", f"Response repeat {r2}"),
                 (folded_y1, "C0", name1, None),
                 (folded_y2, "C1", name2, None),
             ]
@@ -620,7 +620,7 @@ class Diagnostics(BaseDiagnostics):
                     [min_val, max_val],
                     [min_val, max_val],
                     "gray",
-                    linestyle="--",
+                    linestyle=":",
                     alpha=0.5,
                     zorder=1,
                 )
@@ -666,8 +666,8 @@ class Diagnostics(BaseDiagnostics):
         row_subfigs3 = outer_subfigs[2].subfigures(3, 1)
         rows_info_res = [
             (idx_12, f"{name1} vs {name2}"),
-            (idx_1rrr, f"{name1} vs RRR"),
-            (idx_2rrr, f"{name2} vs RRR"),
+            (idx_1rrr, f"{name1} vs Data"),
+            (idx_2rrr, f"{name2} vs Data"),
         ]
 
         for row_idx, ((orientation_idx, c1, c2), comp_name) in enumerate(rows_info_res):
@@ -698,7 +698,7 @@ class Diagnostics(BaseDiagnostics):
                 max_val = 1.0
 
             cols_config = [
-                (x_rrr, y_rrr, "C4", "RRR", "Cell j Noise"),
+                (x_rrr, y_rrr, "C4", "Data", "Cell j Noise"),
                 (x_y1, y_y1, "C0", name1, None),
                 (x_y2, y_y2, "C1", name2, None),
             ]
