@@ -279,7 +279,7 @@ async def _generate_one_param_est(
     """Generates the numpy parameter estimator code for a single program using an LLM.
 
     This function constructs a prompt tailored for parameter estimator generation, calls
-    the specified LLM with a fixed temperature of 1.0, and returns the generated code string.
+    the specified LLM with the configured `param_est_temperature`, and returns the generated code string.
 
     Args:
         program: The program for which to generate the parameter estimator code.
@@ -287,7 +287,7 @@ async def _generate_one_param_est(
         prompt_schema: The schema used to build the LLM prompt.
         llm: The LLM model name (str) or a pre-configured PydanticAI Model instance to use.
         config: Configuration dictionary containing LLM call parameters like
-            `log_raw_llm_response`, `max_tokens`, and `retry_config`.
+            `param_est_temperature`, `log_raw_llm_response`, `max_tokens`, and `retry_config`.
         output_schema: The Pydantic model to parse the LLM's structured output. Defaults
             to `ParamEstSchema`.
 
@@ -302,7 +302,7 @@ async def _generate_one_param_est(
         prompt=prompt,
         llm_model=llm,
         output_type=output_schema,
-        temperature=1.0,
+        temperature=config["param_est_temperature"],
         log_raw_llm_response=config.get("log_raw_llm_response", False),
         max_tokens=config.get("max_tokens"),
         retry_config=config.get("retry_config"),

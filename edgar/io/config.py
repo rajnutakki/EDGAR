@@ -262,6 +262,7 @@ class LLMsConfig(_LaxModel):
         param_est_llm: The LLM model to use for generating `parameter_estimator` code.
         jax_model_translator_llm: The LLM model to use for translating numpy `model`
             code into JAX-compatible code.
+        param_est_temperature: The sampling temperature to use when generating parameter estimators.
         log_raw_llm_response: If True, logs the raw JSON responses from LLM calls
             for debugging purposes.
         max_lines: The maximum number of lines allowed in generated code snippets.
@@ -278,6 +279,7 @@ class LLMsConfig(_LaxModel):
     model_response_schema: ValidResponseSchemas = "ModelSchema"
     param_est_response_schema: ValidResponseSchemas = "ParamEstSchema"
     jax_model_response_schema: ValidResponseSchemas = "TranslationSchema"
+    param_est_temperature: float
     log_raw_llm_response: bool
     max_lines: int
     swear_words: list[str]

@@ -279,7 +279,11 @@ async def test_generate_one_param_est():
     llm = FakeLLM(DEFAULT_FAKE_PROGRAMS)
     llm_model = llm.gen_param_est()  # A TestModel with param_est for Program1
     generated_param_est = await _generate_one_param_est(
-        program, [], prompt_schema, llm_model, config={"n_param_ests": 1}
+        program,
+        [],
+        prompt_schema,
+        llm_model,
+        config={"n_param_ests": 1, "param_est_temperature": 1.0},
     )
     assert generated_param_est == Program1.param_est
     assert program.code.model == model_code  # Check model code is unchanged
@@ -300,7 +304,12 @@ async def test_generate_param_ests_for_program():
     llm = FakeLLM(DEFAULT_FAKE_PROGRAMS)
     llm_model = llm.gen_param_est()  # A TestModel with param_est for Program1
     await _generate_param_ests_for_program(
-        program, [], prompt_schema, llm_model, config={}, n_param_ests=2
+        program,
+        [],
+        prompt_schema,
+        llm_model,
+        config={"param_est_temperature": 1.0},
+        n_param_ests=2,
     )
     assert program.code.param_est == [Program1.param_est, Program1.param_est]
     assert program.code.model == model_code  # Check model code is unchanged
@@ -329,7 +338,10 @@ async def test_generate_param_est():
     llm_models = CyclingModel([llm.gen_param_est() for _ in range(3)])
     population = [no_model] + model_no_param_est + [model_and_param_est]
     await generate_param_ests(
-        population, prompt_schema, llm_models, config={"n_param_ests": 1}
+        population,
+        prompt_schema,
+        llm_models,
+        config={"n_param_ests": 1, "param_est_temperature": 1.0},
     )
 
     # Check expected solutions
@@ -491,7 +503,11 @@ async def test_generate_one_param_est_with_real_llm():
         parent_program_template="Model: {name}\n\n{code.model}",
     )
     generated_param_est = await _generate_one_param_est(
-        program, [], prompt_schema, llm=LLM_MODEL, config={}
+        program,
+        [],
+        prompt_schema,
+        llm=LLM_MODEL,
+        config={"param_est_temperature": 1.0},
     )
     print("Generated param est code:\n", generated_param_est)
     assert "def parameter_estimator(data):" in generated_param_est
@@ -589,3 +605,46 @@ async def test_generate_one_model_with_ideas():
         called_prompt = mock_call.call_args[1]["prompt"]
         assert "Placeholder: " in called_prompt
         assert "Use recurrence" not in called_prompt
+
+
+@pytest.mark.asyncio
+async def test_generate_param_est_uses_configured_temperature():
+    """Verify that _generate_one_param_est passes the configured param_est_temperature to call_llm,
+
+    and raises a KeyError if param_est_temperature is not present in config.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    program = await generate_one_fake_model()
+    prompt_schema = PromptSchema(
+        base="...",
+        explore="...",
+        code_guidelines="...",
+        docstring_guidelines="...",
+        parent_program_template="..",
+        parent_program_vars=[],
+    )
+    llm = FakeLLM(DEFAULT_FAKE_PROGRAMS)
+    llm_model = llm.gen_param_est()
+
+    with patch("edgar.llm.generate.call_llm", new_callable=AsyncMock) as mock_call:
+        mock_call.return_value = None
+        # Test with custom param_est_temperature
+        await _generate_one_param_est(
+            program,
+            [],
+            prompt_schema,
+            llm_model,
+            config={"param_est_temperature": 1.7},
+        )
+        assert mock_call.call_args[1]["temperature"] == 1.7
+
+    # Test that KeyError is raised when param_est_temperature is missing from config
+    with pytest.raises(KeyError):
+        await _generate_one_param_est(
+            program,
+            [],
+            prompt_schema,
+            llm_model,
+            config={},
+        )
