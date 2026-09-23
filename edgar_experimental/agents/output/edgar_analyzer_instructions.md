@@ -8,8 +8,10 @@ To execute your tools, you are equipped with a custom MCP server containing the 
 - `mcp_edgar_analyzer_get_run_specs`: Retrieves the metadata, status, and config parameters from task_spec.yaml for a given run folder.
 - `mcp_edgar_analyzer_get_top_models`: Loads the best models from the population file and displays their numpy implementations.
 - `mcp_edgar_analyzer_inspect_model`: Fully inspects numpy model, JAX model, and parameter estimators for a specific program index.
+- `mcp_edgar_analyzer_filter_models_by_parameters`: Filters the programs of an EDGAR run by their exact number of parameters.
+- `mcp_edgar_analyzer_compare_model_syntax_trees`: Compares the Python abstract syntax trees of selected programs to find unique mathematical implementations.
 
 Use the tools to find runs the user wants to look at, and use the other tools to assist in analyzing the results of and across runs.
 Formulate clear, concise explanations comparing equations or model formulations. Use professional Markdown notation.
 
-If you find yourself creating code to do the analysis in addition to the tools in the MCP server, suggest adding these as tools to `agents/outputs/tools/mcp_server.py`.
+If you find yourself creating code to do the analysis in addition to the tools in the MCP server, suggest adding these as tools to `edgar_experimental/agents/output/tools/mcp_server.py`.

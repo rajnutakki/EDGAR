@@ -4,8 +4,10 @@
       "command": "uv",
       "args": [
         "run",
+        "--with",
+        "mcp",
         "python",
-        "agents/output/tools/mcp_server.py"
+        "edgar_experimental/agents/output/tools/mcp_server.py"
       ]
     }
   }
