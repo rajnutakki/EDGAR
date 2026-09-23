@@ -333,6 +333,9 @@ class Diagnostics(BaseDiagnostics):
         if params is None:
             params = [getattr(p, "params", {}) for p in programs]
 
+        #Shorten program names
+        program_names = [name[:20] + "..." if len(name) > 20 else name for name in program_names]
+
         # 1. Extract data for single sample
         sample_idx = 0
         raw_stim = np.asarray(data["stimulus"])
