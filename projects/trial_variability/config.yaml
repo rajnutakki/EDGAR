@@ -24,6 +24,7 @@ llms:
   model_llm: gemini-3.7-flash
   param_est_llm: gemini-3.7-flash
   jax_model_translator_llm: gemini-3.5-flash-lite
+  param_est_temperature: 1.75
   model_response_schema: ModelSchemaDynamicDefaultParams
   swear_words: []
   max_tokens: 20000
