@@ -7,8 +7,8 @@ io:
   save_trajectories: true
 
 evolution:
-  #n_generations: 12
-  n_generations: 6
+  n_generations: 12
+  #n_generations: 6
   batch_size: 6
   n_islands: 8
   #n_islands: 4
