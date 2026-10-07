@@ -1,0 +1,72 @@
+model:
+  base: 'You are an AI scientist learning a state-space model of synaptic vesicle
+    release. Each sample contains several stimulation protocols that share one
+    parameter set. The framework equilibrates the model without stimulation,
+    resets each protocol to that equilibrated state, performs a dense 0.1 ms
+    rollout, and compares release only at experimental event times.
+
+    Below are {num_parents} models, sorted from worst to best. Analyze their
+    progression and create a mechanistically plausible model that improves on
+    all of them.
+    '
+  code_guidelines: '**Code Generation Guidelines:**
+
+    * Import numpy as np and define `DT = 0.1`.
+
+    * Define `def initial_state(params):` returning a dict of scalar initial
+    reservoir values. These values must be fixed constants or derived from
+    structural parameters such as a total pool size. They must not be separate
+    learnable initial-state parameters.
+
+    * Model signature must be `def model(hidden_state, y_prev, params):` for one
+    Euler step. `y_prev` is a dict containing `stim_prev` and `release_prev`.
+    Return `(new_hidden_state, release)`, where the state dict has exactly the
+    same keys as `initial_state(params)`.
+
+    * After defining the model, set `model.INITIAL_STATE = initial_state`.
+
+    * Do not use any `s0_*` parameters. The framework rejects models without a
+    callable `model.INITIAL_STATE` and performs equilibration before stimulation.
+
+    * Provide `model.DEFAULT_PARAMS`, with one float for every learnable dynamics
+    or structural parameter and no initial-state entries. Its keys must exactly
+    match the keys read from `params` by both `model` and `initial_state`.
+
+    * Use scalar arithmetic only inside `model` and `initial_state`; both are
+    called under jax.jit, jax.grad, jax.vmap, and jax.lax.scan after translation.
+    '
+
+parameter_estimator:
+  code_guidelines: '**Code Generation Guidelines:**
+
+    * Import numpy as np.
+
+    * Define `def parameter_estimator(data):`. The unbatched data contains
+    `release` and `time` arrays shaped `(n_protocols, n_observations)`, padded
+    with NaNs, plus dense stimulus and internal alignment arrays.
+
+    * Return plain Python floats whose keys exactly match `model.DEFAULT_PARAMS`.
+
+    * Do not return `s0_*` or any other initial-state values. Initial state is
+    fixed or derived by the model''s `initial_state(params)` function.
+
+    * Your response must be less than {max_lines} lines, and must not call the
+    model or use fitting functions such as {swear_words}.
+    '
+
+jax_translator_model:
+  code_guidelines: 'CRITICAL JAX compatibility requirements:
+
+    * Preserve `DT`, `initial_state(params)`, `model(hidden_state, y_prev, params)`,
+    `model.DEFAULT_PARAMS`, and `model.INITIAL_STATE = initial_state`.
+
+    * Replace numpy with jax.numpy as jnp. Both functions must remain compatible
+    with jax.jit, jax.grad, jax.vmap, and jax.lax.scan.
+
+    * Keep the hidden-state dictionary structure invariant. Avoid Python control
+    flow depending on traced values, dynamic shapes, and conversion of JAX values
+    with Python int or float.
+
+    * Do not introduce `s0_*` parameters or turn initial-state values into
+    learnable parameters.
+    '
