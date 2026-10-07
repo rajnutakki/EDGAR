@@ -62,12 +62,10 @@ def _load_translated_model(model_name):
 
 
 def _seed_params(reference_model, seed_model, params):
-    """Convert reference INIT values to the seed model's s0 convention."""
-    initial_state = reference_model.initial_state(params)
+    """Remove reference INIT values handled by the seed's initialization hook."""
     seed_params = {
         key: value for key, value in params.items() if not key.startswith("INIT_")
     }
-    seed_params.update({f"s0_{key}": value for key, value in initial_state.items()})
 
     if not np.isclose(reference_model.DT, seed_model.DT, rtol=0.0, atol=0.0):
         raise ValueError(

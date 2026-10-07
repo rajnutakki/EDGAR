@@ -3,6 +3,19 @@ import numpy as np
 DT = 0.1  # integration step, ms (matches the data-generating grid)
 
 
+def initial_state(params):
+    """Return the fixed Berkeley Madonna initialization for the RP model."""
+    TS = 2.0
+    LTS = 0.0
+    return {
+        "LS": params["N"] - TS - LTS,
+        "TS": TS,
+        "LTS": LTS,
+        "RP": 3.0,
+        "Ca": 0.0,
+    }
+
+
 def model(hidden_state, y_prev, params):
     """Replacement Pool (RP) model of synaptic transmission.
 
@@ -90,24 +103,19 @@ def model(hidden_state, y_prev, params):
 
 
 model.DEFAULT_PARAMS = {
-    "N": 100.0,
-    "Pf": 0.3,
+    "N": 10.0,
+    "Pf": 0.7,
     "b2": 0.001,
     "b3": 100.0,
-    "k": 0.1,
-    "NRPoverN": 2.0,
-    "k5": 0.01,
-    "deltaca": 1.0,
-    "cadecay": 10.0,
+    "k": 0.3,
+    "NRPoverN": 0.7,
+    "k5": 0.005,
+    "deltaca": 0.1,
+    "cadecay": 100.0,
     "Crest": 0.05,
     "k2rest": 0.001,
-    "k1rest": 0.001,
-    "s1": 0.1,
+    "k1rest": 0.008,
+    "s1": 0.2,
     "s2": 0.1,
-    "s0_LS": 70.0,
-    "s0_TS": 30.0,
-    "s0_LTS": 0.0,
-    "s0_RP": 200.0,
-    "s0_Ca": 0.0,
-    "log_noise_coef": -4.6052,
 }
+model.INITIAL_STATE = initial_state
