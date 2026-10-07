@@ -1,0 +1,32 @@
+run:
+  random_seed: 42
+
+io:
+  data_path: "/home/rajah/projects/synaptic_transmission/dataset/data.npz"
+
+project_params:
+  discovery_equilibration_ms: 30000.0
+  validation_equilibration_ms: 24000.0
+
+evolution:
+  n_generations: 2
+  n_islands: 2
+  batch_size: 2
+  critical_population_size: 6
+  n_migrants: 1
+  topology: [1, 0]
+
+llms:
+  num_parents: 2
+  model_llm: gemini-3.7-flash
+  param_est_llm: gemini-3.7-flash
+  jax_model_translator_llm: gemini-2.5-flash-lite
+  max_tokens: 10000
+
+scoring:
+  timeout_s: 600
+  param_penalty_weight: 0
+  gradient_descent:
+    max_iter: 200         
+    learning_rate: 0.001
+    gradient_clip_norm: 5.0
