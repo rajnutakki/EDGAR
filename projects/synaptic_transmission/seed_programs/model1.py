@@ -2,6 +2,17 @@ import numpy as np
 
 DT = 0.1  # integration step, ms (matches the data-generating grid)
 
+
+def initial_state(params):
+    """Return the fixed Berkeley Madonna initialization for the Neher model."""
+    return {
+        "ES": params["Ntotal"],
+        "LS": 0.0,
+        "TS": 0.0,
+        "Ca": 0.0,
+        "LTS": 0.0,
+    }
+
 def model(hidden_state, y_prev, params):
     """Neher model of synaptic transmission with multi-step vesicle priming and calcium dynamics.
 
@@ -85,23 +96,19 @@ def model(hidden_state, y_prev, params):
 
 
 model.DEFAULT_PARAMS = {
-    "b1": 0.005,
-    "b2": 0.001,
-    "b3": 100.0,
-    "Pf": 0.3,
-    "k": 0.1,
-    "k_1": 10.0,
-    "deltaca": 1.0,
-    "cadecay": 10.0,
+    "b1": 0.0001,
+    "b2": 0.0002,
+    "b3": 150.0,
+    "Pf": 0.6,
+    "k": 0.2,
+    "k_1": 0.15,
+    "deltaca": 0.1,
+    "cadecay": 100.0,
     "Crest": 0.05,
-    "k2rest": 0.001,
-    "k1rest": 0.001,
-    "s1": 0.1,
-    "s2": 0.1,
-    "s0_ES": 70.0,
-    "s0_LS": 20.0,
-    "s0_TS": 10.0,
-    "s0_Ca": 0.0,
-    "s0_LTS": 0.0,
-    "log_noise_coef": -4.6052,
+    "k2rest": 0.0002,
+    "k1rest": 0.0003,
+    "s1": 0.3,
+    "s2": 0.2,
+    "Ntotal": 10.0,
 }
+model.INITIAL_STATE = initial_state
