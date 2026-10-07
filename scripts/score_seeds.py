@@ -19,7 +19,7 @@ if "--xla_gpu_enable_command_buffer=" not in _xla_flags:
     os.environ["XLA_FLAGS"] = (_xla_flags + " --xla_gpu_enable_command_buffer=").strip()
 
 
-def score_seeds(project_name: str):
+def score_seeds(project_name: str, save_population: bool = False):
     repo_root = Path(__file__).resolve().parent.parent
     path = repo_root / "projects" / project_name / "config.yaml"
     print(f"Loading config from: {path}")
@@ -30,6 +30,7 @@ def score_seeds(project_name: str):
         data_path=spec.io["data_path"], **spec.project_params
     )
     # Do naive jax translation
+    print("Translating model to jax...")
     population = Population()
     for program in spec.seed_programs:
         program.code.model_jax = translate_to_jax(program.code.model)
@@ -38,6 +39,7 @@ def score_seeds(project_name: str):
 
     # Scoring
     # Discover scoring
+    print("Discover scoring...")
     score(
         population,
         X_discover,
@@ -47,26 +49,32 @@ def score_seeds(project_name: str):
         split="discover",
         apply_model_fn=spec.apply_model_fn,
     )
-    # Validate scoring
-    population.prepare_validation_scoring(islands=islands)
-    score(
-        population,
-        X_validate,
-        None,
-        spec.scoring,
-        spec.loss_fn,
-        split="validate",
-        apply_model_fn=spec.apply_model_fn,
-    )
+    # # Validate scoring
+    # print("Validate scoring...")
+    # population.prepare_validation_scoring(islands=islands)
+    # score(
+    #     population,
+    #     X_validate,
+    #     None,
+    #     spec.scoring,
+    #     spec.loss_fn,
+    #     split="validate",
+    #     apply_model_fn=spec.apply_model_fn,
+    # )
     print("Scoring complete\n --------- \n ")
     for i, program in enumerate(population):
         print(f"Seed {i + 1}:")
         print(f"Number of Parameters: {program.n_params}\n")
         print(f"Discover Score: {program.program_losses.discover.final}")
-        print(f"Validate Score: {program.program_losses.validate.final}")
+        # print(f"Validate Score: {program.program_losses.validate.final}")
         print(f"Number of Parameters: {program.n_params}\n")
 
+    if save_population:
+        save_path = repo_root / "projects" / project_name / "scored_seeds.jsonl"
+        print(f"Saving population of scored seeds to: {save_path}")
+        population.save(save_path)
 
 if __name__ == "__main__":
     project_name = sys.argv[1]
-    score_seeds(project_name)
+    save_population = bool(int(sys.argv[2])) if len(sys.argv) > 2 else False
+    score_seeds(project_name, save_population)
