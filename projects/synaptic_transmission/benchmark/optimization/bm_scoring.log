@@ -1,0 +1,234 @@
+Scoring Neher, NM_FSIN_4Pr_v3, perturbation 0.0
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 1 (Neher)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/Neher/NM_FSIN_4Pr_v3.csv
+Perturbation: Normal(mean=1, std=0), random seed=42
+  b1: factor=1, value=0.00015
+  b2: factor=1, value=0.000191401397841
+  b3: factor=1, value=118.334956427
+  Pf: factor=1, value=0.60664
+  k: factor=1, value=0.200386374364
+  k_1: factor=1, value=0.18600392502
+  deltaca: factor=1, value=0.11
+  cadecay: factor=1, value=116.528170275
+  Crest: factor=1, value=0.05
+  k2rest: factor=1, value=0.000148755978222
+  k1rest: factor=1, value=0.000326242020624
+  s1: factor=1, value=0.213222928167
+  s2: factor=1, value=0.270177799136
+  Ntotal: factor=1, value=15.4768528933
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.007819335907697678
+Final discovery score:   0.007819335907697678
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/Neher_NM_FSIN_4Pr_v3_perturbation_0.0.jsonl
+Scoring Neher, NM_FSIN_4Pr_v3, perturbation 0.1
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 1 (Neher)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/Neher/NM_FSIN_4Pr_v3.csv
+Perturbation: Normal(mean=1, std=0.1), random seed=42
+  b1: factor=1.0304717, value=0.000154570756196
+  b2: factor=0.89600159, value=0.000171495956675
+  b3: factor=1.0750451, value=127.215417382
+  Pf: factor=1.0940565, value=0.663698417955
+  k: factor=0.80489648, value=0.161290287593
+  k_1: factor=0.86978205, value=0.161782875085
+  deltaca: factor=1.012784, value=0.111406244435
+  cadecay: factor=0.96837574, value=112.84305321
+  Crest: factor=0.99831988, value=0.0499159942125
+  k2rest: factor=0.91469561, value=0.00013606643983
+  k1rest: factor=1.0879398, value=0.00035493167785
+  s1: factor=1.0777792, value=0.229807235565
+  s2: factor=1.0066031, value=0.27196180199
+  Ntotal: factor=1.1127241, value=17.2214675268
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.05436715856194496
+Final discovery score:   0.05436715856194496
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/Neher_NM_FSIN_4Pr_v3_perturbation_0.1.jsonl
+Scoring Neher, NM_FSIN_4Pr_v3, perturbation 0.3
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 1 (Neher)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/Neher/NM_FSIN_4Pr_v3.csv
+Perturbation: Normal(mean=1, std=0.3), random seed=42
+  b1: factor=1.0914151, value=0.000163712268589
+  b2: factor=0.68800477, value=0.000131685074341
+  b3: factor=1.2251354, value=144.976339293
+  Pf: factor=1.2821694, value=0.777815253865
+  k: factor=0.41468944, value=0.0830981140508
+  k_1: factor=0.60934615, value=0.113340775213
+  deltaca: factor=1.0383521, value=0.114218733305
+  cadecay: factor=0.90512722, value=105.47281908
+  Crest: factor=0.99495965, value=0.0497479826374
+  k2rest: factor=0.74408682, value=0.000110687363048
+  k1rest: factor=1.2638194, value=0.0004123109923
+  s1: factor=1.2333376, value=0.26297585036
+  s2: factor=1.0198092, value=0.275529807698
+  Ntotal: factor=1.3381724, value=20.7106967939
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.45187029242515564
+Final discovery score:   0.45187029242515564
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/Neher_NM_FSIN_4Pr_v3_perturbation_0.3.jsonl
+Scoring Neher, NM_FSIN_4Pr_v9, perturbation 0.0
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 1 (Neher)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/Neher/NM_FSIN_4Pr_v9.csv
+Perturbation: Normal(mean=1, std=0), random seed=42
+  b1: factor=1, value=1.11159399504e-07
+  b2: factor=1, value=0.000297308070303
+  b3: factor=1, value=299.99969323
+  Pf: factor=1, value=0.697658964218
+  k: factor=1, value=0.291753551965
+  k_1: factor=1, value=0.115025413214
+  deltaca: factor=1, value=0.11
+  cadecay: factor=1, value=107.377160494
+  Crest: factor=1, value=0.05
+  k2rest: factor=1, value=0.000249127409364
+  k1rest: factor=1, value=0.000235387013716
+  s1: factor=1, value=0.574321252572
+  s2: factor=1, value=0.224245765155
+  Ntotal: factor=1, value=10
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.011830221861600876
+Final discovery score:   0.011830221861600876
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/Neher_NM_FSIN_4Pr_v9_perturbation_0.0.jsonl
+Scoring Neher, NM_FSIN_4Pr_v9, perturbation 0.1
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 1 (Neher)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/Neher/NM_FSIN_4Pr_v9.csv
+Perturbation: Normal(mean=1, std=0.1), random seed=42
+  b1: factor=1.0304717, value=1.14546616264e-07
+  b2: factor=0.89600159, value=0.000266388503526
+  b3: factor=1.0750451, value=322.513206083
+  Pf: factor=1.0940565, value=0.7632783048
+  k: factor=0.80489648, value=0.234831407335
+  k_1: factor=0.86978205, value=0.100047039629
+  deltaca: factor=1.012784, value=0.111406244435
+  cadecay: factor=0.96837574, value=103.981437334
+  Crest: factor=0.99831988, value=0.0499159942125
+  k2rest: factor=0.91469561, value=0.000227875746989
+  k1rest: factor=1.0879398, value=0.000256086900033
+  s1: factor=1.0777792, value=0.618991496431
+  s2: factor=1.0066031, value=0.225726475584
+  Ntotal: factor=1.1127241, value=11.127241207
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.038767747581005096
+Final discovery score:   0.038767747581005096
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/Neher_NM_FSIN_4Pr_v9_perturbation_0.1.jsonl
+Scoring Neher, NM_FSIN_4Pr_v9, perturbation 0.3
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 1 (Neher)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/Neher/NM_FSIN_4Pr_v9.csv
+Perturbation: Normal(mean=1, std=0.3), random seed=42
+  b1: factor=1.0914151, value=1.21321049785e-07
+  b2: factor=0.68800477, value=0.000204549369971
+  b3: factor=1.2251354, value=367.540231788
+  Pf: factor=1.2821694, value=0.894516985964
+  k: factor=0.41468944, value=0.120987118075
+  k_1: factor=0.60934615, value=0.0700902924574
+  deltaca: factor=1.0383521, value=0.114218733305
+  cadecay: factor=0.90512722, value=97.1899910157
+  Crest: factor=0.99495965, value=0.0497479826374
+  k2rest: factor=0.74408682, value=0.000185372422239
+  k1rest: factor=1.2638194, value=0.000297486672667
+  s1: factor=1.2333376, value=0.708331984151
+  s2: factor=1.0198092, value=0.228687896444
+  Ntotal: factor=1.3381724, value=13.3817236209
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.34524551033973694
+Final discovery score:   0.34524551033973694
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/Neher_NM_FSIN_4Pr_v9_perturbation_0.3.jsonl
+Scoring RP, MZM_FSIN_4Prot_v11b, perturbation 0.0
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 2 (RP)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/RP/MZM_FSIN_4Prot_v11b.csv
+Perturbation: Normal(mean=1, std=0), random seed=42
+  N: factor=1, value=10
+  Pf: factor=1, value=0.695070192925
+  b2: factor=1, value=0.00113017818388
+  b3: factor=1, value=117.815647029
+  k: factor=1, value=0.322325728084
+  NRPoverN: factor=1, value=0.8
+  k5: factor=1, value=0.0055
+  deltaca: factor=1, value=0.11
+  cadecay: factor=1, value=81.542131205
+  Crest: factor=1, value=0.05
+  k2rest: factor=1, value=0.000999106019181
+  k1rest: factor=1, value=0.0079507103899
+  s1: factor=1, value=0.203306455509
+  s2: factor=1, value=0.0910012824847
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.011488043703138828
+Final discovery score:   0.011488043703138828
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/RP_MZM_FSIN_4Prot_v11b_perturbation_0.0.jsonl
+Scoring RP, MZM_FSIN_4Prot_v11b, perturbation 0.1
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 2 (RP)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/RP/MZM_FSIN_4Prot_v11b.csv
+Perturbation: Normal(mean=1, std=0.1), random seed=42
+  N: factor=1.0304717, value=10.3047170798
+  Pf: factor=0.89600159, value=0.622783997589
+  b2: factor=1.0750451, value=0.00121499254084
+  b3: factor=1.0940565, value=128.896971092
+  k: factor=0.80489648, value=0.259438844314
+  NRPoverN: factor=0.86978205, value=0.695825639451
+  k5: factor=1.012784, value=0.00557031222174
+  deltaca: factor=0.96837574, value=0.106521331484
+  cadecay: factor=0.99831988, value=81.405130986
+  Crest: factor=0.91469561, value=0.0457347803621
+  k2rest: factor=1.0879398, value=0.00108696720018
+  k1rest: factor=1.0777792, value=0.00856911023212
+  s1: factor=1.0066031, value=0.204648902216
+  s2: factor=1.1127241, value=0.101259322035
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.01450300868600607
+Final discovery score:   0.010453527793288231
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/RP_MZM_FSIN_4Prot_v11b_perturbation_0.1.jsonl
+Scoring RP, MZM_FSIN_4Prot_v11b, perturbation 0.3
+Loading config from: /home/rajah/repos/EDGAR/projects/synaptic_transmission/config.yaml
+Seed: 2 (RP)
+Parameter set: /home/rajah/projects/synaptic_transmission/parameter_sets/RP/MZM_FSIN_4Prot_v11b.csv
+Perturbation: Normal(mean=1, std=0.3), random seed=42
+  N: factor=1.0914151, value=10.9141512393
+  Pf: factor=0.68800477, value=0.478211606916
+  b2: factor=1.2251354, value=0.00138462125476
+  b3: factor=1.2821694, value=151.059619219
+  k: factor=0.41468944, value=0.133665076774
+  NRPoverN: factor=0.60934615, value=0.487476918353
+  k5: factor=1.0383521, value=0.00571093666523
+  deltaca: factor=0.90512722, value=0.0995639944527
+  cadecay: factor=0.99495965, value=81.1311305481
+  Crest: factor=0.74408682, value=0.0372043410864
+  k2rest: factor=1.2638194, value=0.00126268956216
+  k1rest: factor=1.2333376, value=0.00980590991656
+  s1: factor=1.0198092, value=0.207333795632
+  s2: factor=1.3381724, value=0.121775401136
+Translating model to JAX...
+Loading data...
+Scoring discovery split...
+Scoring complete
+Initial discovery score: 0.049132708460092545
+Final discovery score:   0.012958884239196777
+Saving scored population to: /home/rajah/repos/EDGAR/projects/synaptic_transmission/benchmark/RP_MZM_FSIN_4Prot_v11b_perturbation_0.3.jsonl
