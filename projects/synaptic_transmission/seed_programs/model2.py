@@ -49,7 +49,6 @@ def model(hidden_state, y_prev, params):
     k5 = params["k5"]
     deltaca = params["deltaca"]
     cadecay = params["cadecay"]
-    Crest = params["Crest"]
     k2rest = params["k2rest"]
     k1rest = params["k1rest"]
     s1 = params["s1"]
@@ -59,11 +58,10 @@ def model(hidden_state, y_prev, params):
     # Functions
     N_RP = N * NRPoverN
     SumLS_TS_LTS = LS_prev + TS_prev + LTS_prev
-    totalCa = Ca_prev + Crest
-    sigma2 = s2 / (cadecay * deltaca)
-    sigma1 = s1 / (cadecay * deltaca)
-    k2 = k2rest + sigma2 * (totalCa - Crest)
-    k1 = (k1rest + (sigma1 * (totalCa - Crest))) * ((N - SumLS_TS_LTS) / N)
+    sigma2 = s2 * cadecay / deltaca
+    sigma1 = s1 * cadecay / deltaca
+    k2 = k2rest + sigma2 * Ca_prev
+    k1 = (k1rest + (sigma1 * Ca_prev)) * ((N - SumLS_TS_LTS) / N)
 
     # Evoked release and transition by stimulus
     release1 = Pf * TS_prev * P
@@ -77,11 +75,11 @@ def model(hidden_state, y_prev, params):
     J3 = b2 * TS_prev
     J4 = F1 / DT
     J5 = release1 / DT
-    J8 = LTS_prev / b3
+    J8 = b3 * LTS_prev
     J9 = release2 / DT
     J10 = RP_prev * k2 * ((N - SumLS_TS_LTS) / N)
     J11 = k5 * (N_RP - RP_prev) / N_RP
-    J6 = Ca_prev / cadecay
+    J6 = Ca_prev * cadecay
     J7 = P * deltaca / DT
 
     # Euler update
@@ -106,12 +104,12 @@ model.DEFAULT_PARAMS = {
     "N": 10.0,
     "Pf": 0.7,
     "b2": 0.001,
-    "b3": 100.0,
+    "b3": 0.01,
     "k": 0.3,
     "NRPoverN": 0.7,
     "k5": 0.005,
     "deltaca": 0.1,
-    "cadecay": 100.0,
+    "cadecay": 0.01,
     "Crest": 0.05,
     "k2rest": 0.001,
     "k1rest": 0.008,

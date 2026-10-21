@@ -13,6 +13,7 @@ def initial_state(params):
         "LTS": 0.0,
     }
 
+
 def model(hidden_state, y_prev, params):
     """Neher model of synaptic transmission with multi-step vesicle priming and calcium dynamics.
 
@@ -46,18 +47,16 @@ def model(hidden_state, y_prev, params):
     k_1 = params["k_1"]
     deltaca = params["deltaca"]
     cadecay = params["cadecay"]
-    Crest = params["Crest"]
     k2rest = params["k2rest"]
     k1rest = params["k1rest"]
     s1 = params["s1"]
     s2 = params["s2"]
 
     # Calcium dynamics and transition rate constants
-    totalCa = Ca_prev + Crest
-    sigma2 = s2 / (cadecay * deltaca)
-    sigma1 = s1 / (cadecay * deltaca)
-    k2 = k2rest + sigma2 * (totalCa - Crest)
-    k1 = (k1rest + sigma1 * (totalCa - Crest)) / (1.0 + (totalCa - Crest) / k_1)
+    sigma2 = s2 * cadecay / deltaca
+    sigma1 = s1 * cadecay / deltaca
+    k2 = k2rest + sigma2 * Ca_prev
+    k1 = (k1rest + sigma1 * Ca_prev) / (1.0 + Ca_prev / k_1)
 
     # Evoked release and transition by stimulus
     release1 = Pf * TS_prev * P
@@ -70,11 +69,11 @@ def model(hidden_state, y_prev, params):
     J2 = LS_prev * k2
     J3 = b2 * TS_prev
     J4 = LS_prev * b1
-    J6 = Ca_prev / cadecay
+    J6 = Ca_prev * cadecay
     J7 = P * deltaca / DT
     J5 = release1 / DT
     J8 = F1 / DT
-    J9 = LTS_prev / b3
+    J9 = LTS_prev * b3
     J10 = release2 / DT
 
     # Euler integration
@@ -98,13 +97,12 @@ def model(hidden_state, y_prev, params):
 model.DEFAULT_PARAMS = {
     "b1": 0.0001,
     "b2": 0.0002,
-    "b3": 150.0,
+    "b3": 0.007,
     "Pf": 0.6,
     "k": 0.2,
     "k_1": 0.15,
     "deltaca": 0.1,
-    "cadecay": 100.0,
-    "Crest": 0.05,
+    "cadecay": 0.01,
     "k2rest": 0.0002,
     "k1rest": 0.0003,
     "s1": 0.3,
