@@ -7,12 +7,13 @@ sample.  Protocols have different recording times and are padded with NaNs;
 """
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-
+import csv
 
 DT = 0.1
 DEFAULT_DATA_PATH = "/home/rajah/projects/synaptic_transmission/dataset/data.npz"
@@ -29,7 +30,12 @@ def _data_file(data_path: str) -> Path:
     return path
 
 
-def _load_protocol(npz, dataset_name: str):
+def _load_protocol(npz, dataset_name: str, equilibration_ms: float):
+    """
+        Returns: time (ms) - time in ms from start of the protocol, (n_observations,)
+                 release (SV) - release observations at each time point (n_observations,)
+                 grid - time indices on the DT grid, including equilibration time (n_observations,)
+    """
     time = np.asarray(npz[f"{dataset_name}__time_ms"], dtype=np.float64)
     release = np.asarray(npz[f"{dataset_name}__release_sv"], dtype=np.float64)
     if time.ndim != 1 or release.ndim != 1 or time.shape != release.shape:
@@ -38,7 +44,8 @@ def _load_protocol(npz, dataset_name: str):
         raise ValueError(f"{dataset_name}: observations must start at time zero")
     if np.any(np.diff(time) <= 0.0) or not np.all(np.isfinite(time)):
         raise ValueError(f"{dataset_name}: times must be finite and strictly increasing")
-    grid = time / DT
+    equilibration_steps = equilibration_ms / DT
+    grid = time / DT + equilibration_steps
     if not np.allclose(grid, np.rint(grid), rtol=0.0, atol=1e-6):
         raise ValueError(f"{dataset_name}: times must lie on the {DT} ms grid")
     return time, release, np.asarray(np.rint(grid), dtype=np.int32)
@@ -54,29 +61,29 @@ def _equilibration_stim(equilibration_ms: float) -> np.ndarray:
 
 
 def _make_split(npz, names: tuple[str, ...], equilibration_ms: float):
-    protocols = [_load_protocol(npz, name) for name in names]
+    protocols = [_load_protocol(npz, name, equilibration_ms) for name in names]
     n_protocols = len(protocols)
-    n_observations = max(item[0].size for item in protocols)
-    max_step = max(int(item[2][-1]) for item in protocols)
+    n_observations = max(time.size for (time, _, _) in protocols)
+    max_observation_index = max(int(obs_indices[-1]) for (_, _, obs_indices) in protocols)
 
     time = np.full((1, n_protocols, n_observations), np.nan, dtype=np.float64)
     release = np.full_like(time, np.nan)
-    event_index = np.full((1, n_protocols, n_observations), -1, dtype=np.int32)
-    stim = np.zeros((1, n_protocols, max_step + 1), dtype=np.float64)
+    observation_index = np.full((1, n_protocols, n_observations), -1, dtype=np.int32)
+    stim = np.zeros((1, n_protocols, max_observation_index + 1), dtype=np.float64)
 
-    for protocol_index, (protocol_time, protocol_release, indices) in enumerate(protocols):
-        n = protocol_time.size
-        time[0, protocol_index, :n] = protocol_time
-        release[0, protocol_index, :n] = protocol_release
-        event_index[0, protocol_index, :n] = indices
-        stim[0, protocol_index, indices] = 1.0
+    for protocol_index, (protocol_time, protocol_release, observation_indices) in enumerate(protocols):
+        n_obs = protocol_time.size #n_obs for that protocol 
+        time[0, protocol_index, :n_obs] = protocol_time
+        release[0, protocol_index, :n_obs] = protocol_release
+        observation_index[0, protocol_index, :n_obs] = observation_indices
+        stim[0, protocol_index, observation_indices] = 1.0
 
     return {
         "release": release,
         "time": time,
         "stim": stim,
-        "_event_index": event_index,
-        "_equilibration_stim": _equilibration_stim(equilibration_ms),
+        "_observation_index": observation_index,
+        "_equilibration_time": np.full((1, n_protocols), equilibration_ms, dtype=np.float64),
     }
 
 
@@ -92,16 +99,15 @@ def load_data(
     The train/test split is across protocols, while each split remains one EDGAR
     sample so its fitted parameters are shared across all protocols in that split.
     """
-    del kwargs
     with np.load(_data_file(data_path), allow_pickle=False) as npz:
         disc_train = _make_split(
             npz,
-            ("dataset_01", "dataset_03"),
+            ("dataset_01", "dataset_03", "dataset_04"),
             discovery_equilibration_ms,
         )
         disc_test = _make_split(
             npz,
-            ("dataset_02", "dataset_04"),
+            ("dataset_02",),
             discovery_equilibration_ms,
         )
         val_train = _make_split(
@@ -127,98 +133,72 @@ def _initial_state(model_fn, params: dict) -> dict:
         raise ValueError("synaptic models must define callable model.INITIAL_STATE")
     return initial_state_fn(params)
 
-
-def _apply_legacy_model(model_fn, data, params):
-    """Run the original one-dimensional dense-stimulus interface."""
+@partial(jax.jit, static_argnames=("model_fn",))
+def apply_model(model_fn, data, params):
     stim = data["stim"]
-    release = data["release"]
 
-    def per_sample(stim_s, release_s, params_s):
+    def per_sample(stim_s, params_s):
+
         init_hidden_state = _initial_state(model_fn, params_s)
 
-        def step(carry, stim_prev):
+        def step(carry, stim):
             hidden_state, release_prev = carry
             new_hidden_state, release_next = model_fn(
                 hidden_state,
-                {"stim_prev": stim_prev, "release_prev": release_prev},
+                {"stim_prev": stim, "release_prev": release_prev},
                 params_s,
             )
-            return (new_hidden_state, release_next), release_next
+            output = {**new_hidden_state, "release": release_next}
+            return (new_hidden_state, release_next), output
 
-        initial_release = jnp.zeros_like(release_s[0])
-        _, predictions = jax.lax.scan(
-            step, (init_hidden_state, initial_release), stim_s
-        )
-        return predictions
-
-    return jax.vmap(per_sample, in_axes=(0, 0, 0))(stim, release, params)
-
-
-def _apply_protocol_model(model_fn, data, params):
-    """Roll out each protocol on the dense grid and gather event-time outputs."""
-    stim = data["stim"]
-    event_index = data["_event_index"]
-    equilibration_stim = data["_equilibration_stim"]
-
-    def per_sample(stim_s, event_index_s, equilibration_stim_s, params_s):
-        init_hidden_state = _initial_state(model_fn, params_s)
-
-        def step(carry, stim_value):
-            hidden_state, release_prev = carry
-            new_hidden_state, release_next = model_fn(
-                hidden_state,
-                {"stim_prev": stim_value, "release_prev": release_prev},
-                params_s,
-            )
-            return (new_hidden_state, release_next), release_next
-
-        initial_release = jnp.zeros((), dtype=stim_s.dtype)
-        (equilibrated_state, equilibrated_release), _ = jax.lax.scan(
-            step,
-            (init_hidden_state, initial_release),
-            equilibration_stim_s,
-        )
-
-        def per_protocol(stim_p, event_index_p):
-            _, dense_prediction = jax.lax.scan(
+        def per_protocol(stim_p):
+            initial_release = jnp.zeros((), dtype=stim_p.dtype)
+            _, dense_output = jax.lax.scan(
                 step,
-                (equilibrated_state, equilibrated_release),
+                (init_hidden_state, initial_release),
                 stim_p,
             )
-            safe_index = jnp.maximum(event_index_p, 0)
-            gathered = dense_prediction[safe_index]
-            valid = event_index_p >= 0
-            return jnp.where(valid, gathered, 0.0)
+            dense_output["time"] = jnp.arange(stim_p.shape[0]) * DT
+            return dense_output
 
-        return jax.vmap(per_protocol)(stim_s, event_index_s)
+        return jax.vmap(per_protocol)(stim_s)
 
-    return jax.vmap(per_sample, in_axes=(0, 0, 0, 0))(
-        stim, event_index, equilibration_stim, params
-    )
-
-
-def apply_model(model_fn, data, params):
-    """Apply a seed model to either legacy trajectories or protocol data."""
-    if "_event_index" in data:
-        return _apply_protocol_model(model_fn, data, params)
-    return _apply_legacy_model(model_fn, data, params)
-
+    return jax.vmap(per_sample, in_axes=(0, 0))(stim, params)
 
 def loss_fn(model_output, data):
-    """Sum protocol RMSEs, returning one loss for each EDGAR sample.
+    """Calculate per-sample RMSE over all non-padded observations."""
+    target = data["release"]  # (n_samples, n_protocols, n_observations)
+    observation_index = data["_observation_index"]
+    valid = (observation_index >= 0) & jnp.isfinite(target)
 
-    NaN-padded observations are excluded. Protocols are summed after their
-    individual RMSEs are calculated, so a long protocol does not receive more
-    weight than a short protocol.
-    """
-    target = data["release"] #(n_samples, n_protcols, n_obs)
-    valid = jnp.isfinite(target) & jnp.isfinite(data["time"])
-    valid = valid & (data["_event_index"] >= 0)
-    safe_target = jnp.where(valid, target, 0.0)
-    residual = jnp.where(valid, model_output - safe_target, 0.0)
+    # Preserve the sample and protocol axes while selecting from dense rollout time.
+    safe_index = jnp.maximum(observation_index, 0)
+    predicted_release = jnp.take_along_axis(
+        model_output["release"], safe_index, axis=-1
+    )
+    residual = jnp.where(valid, predicted_release - target, 0.0)
     squared_error = residual**2
-    counts = jnp.sum(valid, axis=-1) #(n_samples, n_protocols)
-    protocol_rmse = jnp.sqrt(
-        jnp.sum(squared_error, axis=-1) / jnp.maximum(counts, 1)
-    ) #(n_samples, n_protocols)
-    return jnp.sum(protocol_rmse, axis=-1)
+    observation_axes = tuple(range(1, squared_error.ndim))
+    counts = jnp.sum(valid, axis=observation_axes)
+    mean_squared_error = (
+        jnp.sum(squared_error, axis=observation_axes) / jnp.maximum(counts, 1)
+    )
+    return jnp.sqrt(mean_squared_error)
+
+def _read_bm_parameters(path: Path) -> dict[str, float]:
+    values: dict[str, float] = {}
+    with path.open(newline="", encoding="utf-8") as stream:
+        reader = csv.DictReader(stream)
+        if reader.fieldnames != ["name", "value"]:
+            raise ValueError(
+                f"Expected columns 'name,value' in {path}, got {reader.fieldnames}"
+            )
+        for row in reader:
+            name = row["name"].strip()
+            if name in values:
+                raise ValueError(f"Duplicate parameter {name!r} in {path}")
+            value = float(row["value"])
+            if not np.isfinite(value):
+                raise ValueError(f"Parameter {name!r} is not finite in {path}")
+            values[name] = value
+    return values
