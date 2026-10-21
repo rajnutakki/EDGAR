@@ -299,6 +299,22 @@ def test_score_one_model_perfect_fit():
     assert outcome == "ok"
 
 
+def test_score_one_model_scipy_optimizer():
+    program = _make_program(FAST_MODEL_CODE)
+    data = (_make_data(), _make_data())
+    config = {
+        **BASE_CONFIG,
+        "optimizer": "scipy",
+        "scipy_minimize": {"method": "Powell", "options": {"maxiter": 30}},
+    }
+    final_loss, _, _, params, *rest = _score_one_model(program, data, loss_fn, config)
+    assert final_loss < 1e-4
+    assert params["w"] is not None
+    trajectories = rest[6]
+    assert trajectories.shape[0] == 1
+    assert np.isfinite(trajectories[0, 0])
+
+
 try:
     gpu_available = len(jax.devices("gpu")) > 0
 except Exception:

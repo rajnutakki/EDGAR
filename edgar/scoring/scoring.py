@@ -16,7 +16,7 @@ import cloudpickle
 import numpy as np
 import jax
 import jax.numpy as jnp
-from .optimizer import Optimizer
+from .optimizer import AdamOptimizer, ScipyOptimizer
 import warnings
 
 from ..evolution.program import (
@@ -119,16 +119,32 @@ def _optimize(
     """
     if isinstance(params_inits, dict):
         params_inits = [params_inits]
+    # Keep direct callers from older integrations working; worker passes the
+    # complete scoring section.
+    scoring_config = gd_config
+    if "learning_rate" in scoring_config:
+        scoring_config = {"optimizer": "adam", "gradient_descent": scoring_config}
 
-    # Initialize the optimizer
-    optimizer = Optimizer(model_fn, loss_fn, data_train, gd_config, apply_model_fn)
-    flat_all, opt_state = optimizer.flatten_and_init_params(params_inits)
-    # Run the JIT-compiled optimization on-device, this is the only part run on GPU
-    optimized_params, loss_trajectories = optimizer.run_optimization(
-        flat_all, opt_state
-    )
-    loss_trajectories = np.asarray(loss_trajectories).T  # (n_opts, max_iter)
-    return optimized_params, loss_trajectories
+    selector = scoring_config.get("optimizer", "adam")
+    if selector == "adam":
+        optimizer = AdamOptimizer(
+            model_fn,
+            loss_fn,
+            data_train,
+            scoring_config["gradient_descent"],
+            apply_model_fn,
+        )
+    elif selector == "scipy":
+        scipy_config = scoring_config.get("scipy_minimize", {})
+        if hasattr(scipy_config, "model_dump"):
+            scipy_config = scipy_config.model_dump(exclude_none=True)
+        optimizer = ScipyOptimizer(
+            model_fn, loss_fn, data_train, scipy_config, apply_model_fn
+        )
+    else:
+        raise ValueError(f"Unknown scoring optimizer: {selector}")
+    params, trajectories = optimizer.optimize(params_inits)
+    return params, np.asarray(trajectories)
 
 
 def _worker(
@@ -239,7 +255,7 @@ def _worker(
             loss_fn_train,
             params_inits,
             data_train,
-            config["gradient_descent"],
+            config,
             apply_model_fn,
         )
 

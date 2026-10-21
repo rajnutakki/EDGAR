@@ -325,6 +325,15 @@ class GradientDescentConfig(_LaxModel):
     gradient_clip_norm: float | None = None
 
 
+class ScipyMinimizeConfig(_LaxModel):
+    """Supported keyword arguments for ``scipy.optimize.minimize``."""
+
+    method: str | None = None
+    tol: float | None = None
+    bounds: list[tuple[float | None, float | None]] | None = None
+    options: dict = field(default_factory=dict)
+
+
 class ScoringConfig(_LaxModel):
     """Configuration settings for model scoring and evaluation.
 
@@ -346,6 +355,8 @@ class ScoringConfig(_LaxModel):
     banned_strings: list[str]
     n_param_ests: int
     gradient_descent: GradientDescentConfig
+    optimizer: Literal["adam", "scipy"] = "adam"
+    scipy_minimize: ScipyMinimizeConfig = field(default_factory=ScipyMinimizeConfig)
     jax_backend: Literal["cpu", "gpu", "tpu"] | None = None
 
     @model_validator(mode="after")
