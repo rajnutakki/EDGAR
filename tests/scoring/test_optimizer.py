@@ -67,24 +67,25 @@ def test_optimizer_parallel_convergence(optimizer):
     assert jnp.all(final_losses < initial_losses)
 
 
-def test_scipy_optimizer_multiple_structured_starts_and_nan_padding():
-    x = jnp.array([[1.0], [2.0]])
-    data = {"x": x, "y": 2 * x}
+def test_scipy_optimizer_independently_fits_multiple_structured_samples():
+    x = jnp.array([[1.0], [2.0]])  # (2, 1) two samples
+    data = {"x": x, "y": jnp.array([[2.0], [3.0]]) * x}  # (2, 1)
 
     def scalar_loss(output, target):
         return jnp.mean((output - target["y"]) ** 2, axis=-1)
 
     # Structured params are handled by ravel/unravel and SciPy finite differences.
+    # Each sample has its own target and should get its own fitted parameter.
     def model(data, params):
         return params["nested"]["w"] * data["x"]
 
     optimizer = ScipyOptimizer(
-        model, scalar_loss, data, {"method": "Powell", "options": {"maxiter": 80}}
+        model, scalar_loss, data, {"method": "Powell", "options": {"maxiter": 30}}
     )
     starts = [{"nested": {"w": jnp.full((2,), w)}} for w in (0.0, 8.0)]
     params, traces = optimizer.optimize(starts)
     assert len(params) == 2
-    assert all(np.allclose(p["nested"]["w"], 2.0, atol=0.1) for p in params)
+    assert all(np.allclose(p["nested"]["w"], [2.0, 3.0], atol=1e-4) for p in params)
     assert traces.shape[0] == 2
     assert np.all(np.isfinite(traces))
     assert np.all(np.isfinite(traces[:, 0]))

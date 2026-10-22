@@ -280,47 +280,75 @@ class ScipyOptimizer(Optimizer):
         from scipy.optimize import minimize
 
         results, trajectories = [], []
+        data_leaves = jax.tree_util.tree_leaves(self.data_train)
+        if not data_leaves:
+            raise ValueError("SciPy optimization requires batched training data")
+        n_samples = data_leaves[0].shape[0]
+        if n_samples == 0:
+            raise ValueError("SciPy optimization requires at least one sample")
+
         for initial in params_inits:
-            flat, unflatten = ravel_pytree(initial)
-            trace = []
+            sample_results, sample_traces = [], []
+            for sample_idx in range(n_samples):
+                sample_initial = jax.tree_util.tree_map(
+                    lambda leaf: leaf[sample_idx], initial
+                )
+                sample_data = jax.tree_util.tree_map(
+                    lambda leaf: jnp.expand_dims(leaf[sample_idx], axis=0),
+                    self.data_train,
+                )
+                flat, unflatten = ravel_pytree(sample_initial)
+                trace = []
 
-            def objective(values):
-                loss = float(self._loss_for(values, unflatten))
-                return loss
+                def objective(values):
+                    params = jax.tree_util.tree_map(
+                        lambda leaf: jnp.expand_dims(leaf, axis=0), unflatten(values)
+                    )
+                    return float(
+                        evaluate_scalar_loss(
+                            self.model_fn,
+                            self.loss_fn,
+                            params,
+                            sample_data,
+                            self.apply_model_fn,
+                        )
+                    )
 
-            initial_loss = objective(flat)
-            trace.append(initial_loss)
+                trace.append(objective(flat))
 
-            def callback(values):
-                trace.append(objective(values))
+                def callback(values):
+                    trace.append(objective(values))
 
-            result = minimize(
-                objective,
-                jnp.asarray(flat).astype(float),
-                method=self.scipy_config.get("method"),
-                tol=self.scipy_config.get("tol"),
-                bounds=self.scipy_config.get("bounds"),
-                options=self.scipy_config.get("options"),
-                callback=callback,
+                result = minimize(
+                    objective,
+                    np.asarray(flat, dtype=float),
+                    method=self.scipy_config.get("method"),
+                    tol=self.scipy_config.get("tol"),
+                    bounds=self.scipy_config.get("bounds"),
+                    options=self.scipy_config.get("options"),
+                    callback=callback,
+                )
+                final_loss = objective(result.x)
+                if not np.isclose(trace[-1], final_loss):
+                    trace.append(final_loss)
+                if not np.isfinite(final_loss):
+                    raise ValueError("SciPy optimizer returned a non-finite loss")
+                sample_results.append(unflatten(result.x))
+                sample_traces.append(trace)
+
+            results.append(
+                jax.tree_util.tree_map(
+                    lambda *leaves: jnp.stack(leaves), *sample_results
+                )
             )
-            final_loss = objective(result.x)
-            if not trace or not jnp.isclose(trace[-1], final_loss):
-                trace.append(final_loss)
-            if not jnp.isfinite(final_loss):
-                raise ValueError("SciPy optimizer returned a non-finite loss")
-            results.append(unflatten(result.x))
-            trajectories.append(trace)
+            width = max(map(len, sample_traces))
+            aligned = [
+                trace + [trace[-1]] * (width - len(trace)) for trace in sample_traces
+            ]
+            trajectories.append(np.mean(aligned, axis=0))
         width = max(map(len, trajectories), default=0)
-        padded = np.full((len(trajectories), width), np.nan)
+        padded = np.empty((len(trajectories), width))
         for i, trace in enumerate(trajectories):
             padded[i, : len(trace)] = trace
+            padded[i, len(trace) :] = trace[-1]
         return results, padded
-
-    def _loss_for(self, values, unflatten):
-        return evaluate_scalar_loss(
-            self.model_fn,
-            self.loss_fn,
-            unflatten(values),
-            self.data_train,
-            self.apply_model_fn,
-        )

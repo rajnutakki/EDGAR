@@ -101,7 +101,7 @@ def _optimize(
     loss_fn,
     params_inits,
     data_train,
-    gd_config,
+    scoring_config,
     apply_model_fn=apply_model_plain,
 ):
     """Performs gradient descent to optimize a model. If multiple initial parameter sets are provided, they are optimized in parallel.
@@ -111,7 +111,7 @@ def _optimize(
         loss_fn: The loss function (callable).
         params_inits: A list of initial parameter sets (JAX pytrees).
         data_train: A dictionary of training data.
-        gd_config: Configuration dictionary for gradient descent.
+        scoring_config: Configuration dictionary for the scoring process.
 
     Returns:
         optimized_params: A list of optimized parameter sets (JAX pytrees), corresponding to the input `params_inits`.
@@ -119,30 +119,24 @@ def _optimize(
     """
     if isinstance(params_inits, dict):
         params_inits = [params_inits]
-    # Keep direct callers from older integrations working; worker passes the
-    # complete scoring section.
-    scoring_config = gd_config
-    if "learning_rate" in scoring_config:
-        scoring_config = {"optimizer": "adam", "gradient_descent": scoring_config}
 
-    selector = scoring_config.get("optimizer", "adam")
+    selector = scoring_config.get("optimizer")
+    optimizer_config = scoring_config.get("optimizer_config")
     if selector == "adam":
-        optimizer = AdamOptimizer(
-            model_fn,
-            loss_fn,
-            data_train,
-            scoring_config["gradient_descent"],
-            apply_model_fn,
-        )
+        optimizer_t = AdamOptimizer
     elif selector == "scipy":
-        scipy_config = scoring_config.get("scipy_minimize", {})
-        if hasattr(scipy_config, "model_dump"):
-            scipy_config = scipy_config.model_dump(exclude_none=True)
-        optimizer = ScipyOptimizer(
-            model_fn, loss_fn, data_train, scipy_config, apply_model_fn
-        )
+        optimizer_t = ScipyOptimizer
     else:
         raise ValueError(f"Unknown scoring optimizer: {selector}")
+
+    optimizer = optimizer_t(
+        model_fn,
+        loss_fn,
+        data_train,
+        optimizer_config,
+        apply_model_fn,
+    )
+
     params, trajectories = optimizer.optimize(params_inits)
     return params, np.asarray(trajectories)
 

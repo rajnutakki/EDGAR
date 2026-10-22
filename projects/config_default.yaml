@@ -77,8 +77,6 @@ llms:
 scoring:
   # Parameter fitting optimizer: adam (default) or scipy.
   optimizer: adam
-  # SciPy minimize arguments (method, tol, bounds, options) when optimizer is scipy.
-  scipy_minimize: {}
   # Number of parameter estimators to generate and optimize per program
   n_param_ests: 1
   # Complexity penalty on parameterized programs.
