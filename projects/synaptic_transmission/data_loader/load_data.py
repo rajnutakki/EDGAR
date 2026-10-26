@@ -60,30 +60,50 @@ def _equilibration_stim(equilibration_ms: float) -> np.ndarray:
     return np.zeros((1, int(np.rint(steps))), dtype=np.float64)
 
 
-def _make_split(npz, names: tuple[str, ...], equilibration_ms: float):
-    protocols = [_load_protocol(npz, name, equilibration_ms) for name in names]
-    n_protocols = len(protocols)
-    n_observations = max(time.size for (time, _, _) in protocols)
-    max_observation_index = max(int(obs_indices[-1]) for (_, _, obs_indices) in protocols)
+def _make_split(npz, folds: tuple[tuple[str, ...], ...], equilibration_ms: float):
+    """Build a batched split, with one leave-one-out fold per sample."""
+    protocols_by_fold = [
+        [_load_protocol(npz, name, equilibration_ms) for name in names]
+        for names in folds
+    ]
+    n_samples = len(protocols_by_fold)
+    n_protocols = max(len(protocols) for protocols in protocols_by_fold)
+    n_observations = max(
+        time.size
+        for protocols in protocols_by_fold
+        for (time, _, _) in protocols
+    )
+    max_observation_index = max(
+        int(obs_indices[-1])
+        for protocols in protocols_by_fold
+        for (_, _, obs_indices) in protocols
+    )
 
-    time = np.full((1, n_protocols, n_observations), np.nan, dtype=np.float64)
+    time = np.full((n_samples, n_protocols, n_observations), np.nan, dtype=np.float64)
     release = np.full_like(time, np.nan)
-    observation_index = np.full((1, n_protocols, n_observations), -1, dtype=np.int32)
-    stim = np.zeros((1, n_protocols, max_observation_index + 1), dtype=np.float64)
+    observation_index = np.full(
+        (n_samples, n_protocols, n_observations), -1, dtype=np.int32
+    )
+    stim = np.zeros(
+        (n_samples, n_protocols, max_observation_index + 1), dtype=np.float64
+    )
 
-    for protocol_index, (protocol_time, protocol_release, observation_indices) in enumerate(protocols):
-        n_obs = protocol_time.size #n_obs for that protocol 
-        time[0, protocol_index, :n_obs] = protocol_time
-        release[0, protocol_index, :n_obs] = protocol_release
-        observation_index[0, protocol_index, :n_obs] = observation_indices
-        stim[0, protocol_index, observation_indices] = 1.0
+    for sample_index, protocols in enumerate(protocols_by_fold):
+        for protocol_index, (protocol_time, protocol_release, observation_indices) in enumerate(protocols):
+            n_obs = protocol_time.size
+            time[sample_index, protocol_index, :n_obs] = protocol_time
+            release[sample_index, protocol_index, :n_obs] = protocol_release
+            observation_index[sample_index, protocol_index, :n_obs] = observation_indices
+            stim[sample_index, protocol_index, observation_indices] = 1.0
 
     return {
         "release": release,
         "time": time,
         "stim": stim,
         "_observation_index": observation_index,
-        "_equilibration_time": np.full((1, n_protocols), equilibration_ms, dtype=np.float64),
+        "_equilibration_time": np.full(
+            (n_samples, n_protocols), equilibration_ms, dtype=np.float64
+        ),
     }
 
 
@@ -93,35 +113,45 @@ def load_data(
     validation_equilibration_ms: float = DEFAULT_VALIDATION_EQUILIBRATION_MS,
     **kwargs,
 ):
-    """Load the two experiments and their protocol train/test splits.
+    """Load leave-one-dataset-out protocol splits for discovery and validation.
 
-    Discover contains datasets 01--04 and validation contains datasets 05--09.
-    The train/test split is across protocols, while each split remains one EDGAR
-    sample so its fitted parameters are shared across all protocols in that split.
+    Each fold is an EDGAR sample with its own fitted parameters.  The test set
+    holds out one dataset, and the scorer averages the fold losses.
     """
+    discovery_datasets = ("dataset_01", "dataset_02", "dataset_03", "dataset_04")
+    validation_datasets = (
+        "dataset_05", "dataset_06", "dataset_07", "dataset_08", "dataset_09"
+    )
+
+    def leave_one_out_folds(datasets):
+        return tuple(
+            tuple(name for name in datasets if name != held_out)
+            for held_out in datasets
+        )
+
     with np.load(_data_file(data_path), allow_pickle=False) as npz:
         disc_train = _make_split(
             npz,
-            ("dataset_01", "dataset_03", "dataset_04"),
+            leave_one_out_folds(discovery_datasets),
             discovery_equilibration_ms,
         )
         disc_test = _make_split(
             npz,
-            ("dataset_02",),
+            tuple((name,) for name in discovery_datasets),
             discovery_equilibration_ms,
         )
         val_train = _make_split(
             npz,
-            ("dataset_05", "dataset_06", "dataset_08", "dataset_09"),
+            leave_one_out_folds(validation_datasets),
             validation_equilibration_ms,
         )
         val_test = _make_split(
             npz,
-            ("dataset_07",),
+            tuple((name,) for name in validation_datasets),
             validation_equilibration_ms,
         )
 
-    X_eval = {key: value.copy() for key, value in disc_train.items()}
+    X_eval = {key: value[:1].copy() for key, value in disc_train.items()}
     X_eval["_sample_indices"] = np.array([0], dtype=np.int32)
     return ((disc_train, disc_test), (val_train, val_test), X_eval)
 
