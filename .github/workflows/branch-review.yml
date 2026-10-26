@@ -1,0 +1,68 @@
+name: Upstream branch review
+
+on:
+  schedule:
+    # Sundays at 18:00 UTC.
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Fork branch to focus the review on (scheduled runs use main)
+        required: true
+        default: main
+        type: string
+
+concurrency:
+  group: upstream-branch-review
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_BRANCH: ${{ inputs.target_branch || 'main' }}
+    steps:
+      - name: Check out fork repository
+        uses: actions/checkout@v4
+        with:
+          repository: rajnutakki/EDGAR
+          ref: ${{ inputs.target_branch || 'main' }}
+          fetch-depth: 0
+
+      - name: Configure remotes and fetch branches
+        run: |
+          git remote rename origin fork
+          git remote add origin https://github.com/reillytilbury/EDGAR.git
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch --prune fork '+refs/heads/*:refs/remotes/fork/*'
+
+      - name: Install OpenCode
+        run: curl -fsSL https://opencode.ai/v2/install | bash
+
+      - name: Restore OpenCode credentials
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+        run: |
+          test -n "$OPENCODE_AUTH_JSON" || { echo "Missing OPENCODE_AUTH_JSON secret" >&2; exit 1; }
+          install -d -m 700 "$HOME/.local/share/opencode"
+          printf '%s' "$OPENCODE_AUTH_JSON" > "$HOME/.local/share/opencode/auth.json"
+          chmod 600 "$HOME/.local/share/opencode/auth.json"
+
+      - name: Generate branch review
+        run: |
+          set -o pipefail
+          opencode run --agent branch-reviewer --auto \
+            "Review origin/main and fork/main, plus fork branches with commits in the last seven days. Focus recommendations on fork/$TARGET_BRANCH. Produce the required Markdown report. Do not change files." \
+            | tee "$RUNNER_TEMP/branch-review.md"
+
+      - name: Upload review report
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-branch-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/branch-review.md
+          if-no-files-found: error
+          retention-days: 90
