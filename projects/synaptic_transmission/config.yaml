@@ -26,7 +26,12 @@ llms:
 scoring:
   timeout_s: 600
   param_penalty_weight: 0
-  gradient_descent:
-    max_iter: 200         
-    learning_rate: 0.001
-    gradient_clip_norm: 5.0
+  optimizer: "scipy"
+  jax_backend: "cpu"
+  scipy_minimize: 
+    method: "Nelder-Mead"
+    options: 
+      maxiter: 3
+      xatol: 0.0000000001
+      fatol: 0.0001
+      adaptive: True
