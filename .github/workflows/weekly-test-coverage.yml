@@ -50,7 +50,7 @@ jobs:
           enable-cache: true
 
       - name: Install OpenCode
-        run: curl -fsSL https://opencode.ai/install | bash
+        run: curl -fsSL https://opencode.ai/v2/install | bash
 
       - name: Restore OpenCode credentials
         env:
