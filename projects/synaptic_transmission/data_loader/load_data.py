@@ -112,12 +112,12 @@ def load_data(
         )
         val_train = _make_split(
             npz,
-            ("dataset_05", "dataset_07", "dataset_09"),
+            ("dataset_05", "dataset_06", "dataset_08", "dataset_09"),
             validation_equilibration_ms,
         )
         val_test = _make_split(
             npz,
-            ("dataset_06", "dataset_08"),
+            ("dataset_07",),
             validation_equilibration_ms,
         )
 
