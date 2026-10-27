@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   review:
@@ -59,10 +60,44 @@ jobs:
             "Review origin/main and fork/main, plus fork branches with commits in the last seven days. Focus recommendations on fork/$TARGET_BRANCH. Produce the required Markdown report. Do not change files." \
             | tee "$RUNNER_TEMP/branch-review.md"
 
-      - name: Upload review report
-        uses: actions/upload-artifact@v4
-        with:
-          name: upstream-branch-review-${{ github.run_id }}
-          path: ${{ runner.temp }}/branch-review.md
-          if-no-files-found: error
-          retention-days: 90
+      - name: Post report to ongoing review issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPOSITORY="rajnutakki/EDGAR"
+          ISSUE_TITLE="Ongoing branch review"
+          REPORT_FILE="$RUNNER_TEMP/branch-review.md"
+          COMMENT_FILE="$RUNNER_TEMP/branch-review-comment.md"
+
+          ISSUE_NUMBER=$(gh issue list \
+            --repo "$REPOSITORY" \
+            --state open \
+            --limit 100 \
+            --json number,title \
+            --jq '.[] | select(.title == "Ongoing branch review") | .number' \
+            | head -n 1)
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            ISSUE_URL=$(gh issue create \
+              --repo "$REPOSITORY" \
+              --title "$ISSUE_TITLE" \
+              --body "This is the ongoing thread for automated upstream/fork branch review reports. Each scheduled or manually triggered run adds a new comment below.")
+            ISSUE_NUMBER="${ISSUE_URL##*/}"
+            echo "Created ongoing review issue #$ISSUE_NUMBER"
+          fi
+
+          {
+            printf '## Branch review — %s\n\n' "$(date -u +%F)"
+            printf 'Focus branch: `fork/%s`\n\n' "$TARGET_BRANCH"
+            printf '[Actions run #%s](%s/%s/actions/runs/%s)\n\n---\n\n' \
+              "$GITHUB_RUN_NUMBER" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            cat "$REPORT_FILE"
+          } > "$COMMENT_FILE"
+
+          gh issue comment "$ISSUE_NUMBER" \
+            --repo "$REPOSITORY" \
+            --body-file "$COMMENT_FILE"
+          ISSUE_URL=$(gh issue view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json url --jq .url)
+          echo "Review report posted to $ISSUE_URL"
+          echo "Review report posted to [$ISSUE_URL]($ISSUE_URL)" >> "$GITHUB_STEP_SUMMARY"
