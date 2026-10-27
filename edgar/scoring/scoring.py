@@ -10,6 +10,7 @@ and orchestrates population-level scoring and ranking.
 from __future__ import annotations
 
 import time
+import os
 
 import traceback
 import cloudpickle
@@ -26,7 +27,12 @@ from ..evolution.program import (
 )
 from ..evolution.population import Population
 from ..io.metrics import get_active_metrics, stream_line
-from ..process import SubprocessTimeoutError, run_in_subprocess
+from ..process import (
+    SubprocessTimeoutError,
+    available_cpu_count,
+    run_in_subprocess,
+    run_tasks_in_threads,
+)
 from ..jax.utils import _to_jax, _to_numpy, configure_jax_backend
 from .utils import (
     evaluate_sample_losses,
@@ -400,6 +406,7 @@ def _score_one_model(
     split: str = "discover",
     apply_model_fn=apply_model_plain,
     diagnostics=None,
+    cpu_affinity: int | None = None,
 ) -> tuple[
     float,
     float,
@@ -493,6 +500,7 @@ def _score_one_model(
                 diagnostics_bytes,
             ),
             timeout=config["timeout_s"],
+            cpu_affinity=cpu_affinity,
         )
     except SubprocessTimeoutError:
         return (
@@ -637,9 +645,77 @@ def score(
 
     data_store = ScoringDataStore(X_split)
     data_ref = data_store.ref()
+    backend = config.get("jax_backend") or jax.default_backend()
+    cpu_count = available_cpu_count()
     try:
-        for k, program in enumerate(queue, start=1):
-            t0 = time.monotonic()
+        available_cpus = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        available_cpus = list(range(cpu_count))
+    configured_workers = config.get("max_workers")
+    if configured_workers is not None and (
+        not isinstance(configured_workers, int)
+        or isinstance(configured_workers, bool)
+        or configured_workers < 1
+    ):
+        raise ValueError("scoring.max_workers must be a positive integer or None")
+    worker_limit = (
+        min(cpu_count, configured_workers or cpu_count) if backend == "cpu" else 1
+    )
+    worker_limit = max(1, min(worker_limit, n_total or 1))
+    try:
+        jobs = []
+        programs_by_idx = {program.idx: program for program in queue}
+        for position, program in enumerate(queue):
+            if program.n_params is None or _is_banned(
+                config.get("banned_strings", []), program
+            ):
+                continue
+
+            def run(
+                program=program,
+                cpu_affinity=(
+                    available_cpus[position % worker_limit]
+                    if backend == "cpu" and hasattr(os, "sched_setaffinity")
+                    else None
+                ),
+            ):
+                started = time.monotonic()
+                result = _score_one_model(
+                    program,
+                    data_ref,
+                    loss_fn,
+                    config,
+                    X_eval,
+                    split,
+                    apply_model_fn,
+                    diagnostics=diagnostics,
+                    cpu_affinity=cpu_affinity,
+                )
+                return result, (time.monotonic() - started) * 1000.0
+
+            jobs.append((program.idx, run))
+        immediate = {}
+        for program in queue:
+            if program.n_params is None or program.status == "banned":
+                immediate[program.idx] = _score_one_model(
+                    program,
+                    data_ref,
+                    loss_fn,
+                    config,
+                    X_eval,
+                    split,
+                    apply_model_fn,
+                    diagnostics=diagnostics,
+                )
+        completed = run_tasks_in_threads(jobs, worker_limit)
+        # Immediate outcomes (banned / missing parameters) do not consume a worker.
+        ordered_results = [(key, value, None) for key, value in immediate.items()]
+        k = 0
+        for program_idx, result, error in ordered_results:
+            if error is not None:
+                raise error
+            k += 1
+            program = programs_by_idx[program_idx]
             (
                 final_loss,
                 initial_loss,
@@ -654,17 +730,8 @@ def score(
                 trajectories,
                 diagnostics_metrics,
                 outcome,
-            ) = _score_one_model(
-                program,
-                data_ref,
-                loss_fn,
-                config,
-                X_eval,
-                split,
-                apply_model_fn,
-                diagnostics=diagnostics,
-            )
-            latency_ms = (time.monotonic() - t0) * 1000.0
+            ) = result
+            latency_ms = 0.0
             latencies_ms.append(latency_ms)
             counters[outcome] += 1
 
@@ -708,6 +775,58 @@ def score(
                     f"(avg {avg_s:.1f}s, {counters['ok']} ok, "
                     f"{counters['timeout']} timeout, {counters['inf']} inf, "
                     f"{counters['banned']} banned)",
+                )
+        for program_idx, payload, error in completed:
+            if error is not None:
+                raise error
+            result, latency_ms = payload
+            k += 1
+            program = programs_by_idx[program_idx]
+            (
+                final_loss,
+                initial_loss,
+                fingerprint,
+                params,
+                sample_losses,
+                params_init,
+                sample_losses_init,
+                all_final,
+                all_init,
+                best_idx,
+                trajectories,
+                diagnostics_metrics,
+                outcome,
+            ) = result
+            latencies_ms.append(latency_ms)
+            counters[outcome] += 1
+            loss_pair = getattr(program.program_losses, split)
+            loss_pair.init, loss_pair.final = initial_loss, final_loss
+            loss_pair.trajectories = trajectories
+            loss_pair.all_init, loss_pair.all_final = all_init, all_final
+            if best_idx is not None:
+                program.best_estimator_idx = best_idx
+                if program.code.param_est:
+                    program.code.best_param_est = program.code.param_est[best_idx]
+            if fingerprint is not None:
+                program.eval_fingerprint = fingerprint
+            if params is not None:
+                program.params = params
+            if params_init is not None:
+                program.params_init = params_init
+            if sample_losses is not None and split == "discover":
+                program.sample_losses = sample_losses
+            if sample_losses_init is not None and split == "discover":
+                program.sample_losses_init = sample_losses_init
+            if diagnostics_metrics:
+                program.diagnostics = diagnostics_metrics
+            if metrics is not None:
+                metrics.record_score_result(program.idx, latency_ms, outcome)
+            tick_every = 1 if n_total <= 12 else 4
+            if metrics is not None and (k == n_total or k % tick_every == 0):
+                avg_s = (sum(latencies_ms) / len(latencies_ms)) / 1000.0
+                stream_line(
+                    metrics,
+                    f"  [score {split}] {k}/{n_total}  (avg {avg_s:.1f}s, {counters['ok']} ok, {counters['timeout']} timeout, {counters['inf']} inf, {counters['banned']} banned)",
                 )
     finally:
         data_store.cleanup()
