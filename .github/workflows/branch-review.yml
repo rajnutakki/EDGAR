@@ -44,18 +44,28 @@ jobs:
       - name: Install OpenCode
         run: curl -fsSL https://opencode.ai/v2/install | bash
 
-      - name: Restore OpenCode credentials
+      - name: Import OpenCode credentials
         env:
-          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+          OPENCODE_CREDENTIALS_JSON: ${{ secrets.OPENCODE_CREDENTIALS_JSON }}
         run: |
-          test -n "$OPENCODE_AUTH_JSON" || { echo "Missing OPENCODE_AUTH_JSON secret" >&2; exit 1; }
-          install -d -m 700 "$HOME/.local/share/opencode"
-          printf '%s' "$OPENCODE_AUTH_JSON" > "$HOME/.local/share/opencode/auth.json"
-          chmod 600 "$HOME/.local/share/opencode/auth.json"
+          set -euo pipefail
+          test -n "$OPENCODE_CREDENTIALS_JSON" || {
+            echo "::error::Missing OPENCODE_CREDENTIALS_JSON secret"
+            exit 1
+          }
+
+          umask 077
+          credentials_file="$(mktemp "$RUNNER_TEMP/opencode-credentials.XXXXXX")"
+          trap 'rm -f "$credentials_file"' EXIT
+
+          printf '%s' "$OPENCODE_CREDENTIALS_JSON" > "$credentials_file"
+          opencode auth import "$credentials_file"
+          opencode auth list
 
       - name: Generate branch review
         run: |
           set -o pipefail
+          opencode models
           opencode run --model openai/gpt-6-luna --agent branch-reviewer --auto \
             "Review origin/main and fork/main, plus fork branches with commits in the last seven days. Focus recommendations on fork/$TARGET_BRANCH. Produce the required Markdown report. Do not change files." \
             | tee "$RUNNER_TEMP/branch-review.md"
