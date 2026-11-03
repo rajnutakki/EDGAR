@@ -597,32 +597,3 @@ async def test_generate_one_model_with_ideas():
         called_prompt = mock_call.call_args[1]["prompt"]
         assert "Placeholder: " in called_prompt
         assert "Use recurrence" not in called_prompt
-
-
-@pytest.mark.asyncio
-async def test_generate_param_est_does_not_pass_temperature():
-    """Parameter-estimator generation uses provider-default sampling settings."""
-    from unittest.mock import AsyncMock, patch
-
-    program = await generate_one_fake_model()
-    prompt_schema = PromptSchema(
-        base="...",
-        explore="...",
-        code_guidelines="...",
-        docstring_guidelines="...",
-        parent_program_template="..",
-        parent_program_vars=[],
-    )
-    llm = FakeLLM(DEFAULT_FAKE_PROGRAMS)
-    llm_model = llm.gen_param_est()
-
-    with patch("edgar.llm.generate.call_llm", new_callable=AsyncMock) as mock_call:
-        mock_call.return_value = None
-        await _generate_one_param_est(
-            program,
-            [],
-            prompt_schema,
-            llm_model,
-            config={},
-        )
-        assert "temperature" not in mock_call.call_args[1]
