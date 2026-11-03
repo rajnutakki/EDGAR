@@ -203,16 +203,17 @@ async def run(
             # ── Evolution loop ──
             for gen in range(start_gen, n_gens):
                 metrics.start_generation(gen)
-                mode, temperature, llms = spec.schedule(gen)
+                mode, migration_temperature, llms = spec.schedule(gen)
                 n_spawn = n_islands * batch_size
-                gen_banner(log, gen, n_gens, mode, temperature, llms, n_spawn=n_spawn)
+                gen_banner(
+                    log, gen, n_gens, mode, migration_temperature, llms, n_spawn=n_spawn
+                )
 
                 t_spawn(
                     population,
                     islands,
                     gen,
                     mode,
-                    temperature,
                     batch_size=batch_size,
                     num_parents=spec.llms["num_parents"],
                     rng=spec.rng,
@@ -225,7 +226,6 @@ async def run(
                     if isinstance(llms.model, list)
                     else llms.model,
                     mode,
-                    temperature,
                     config=config,
                     spec=spec,
                     data=X_discover[1],
@@ -268,7 +268,7 @@ async def run(
                     islands,
                     population,
                     spec.evolution,
-                    temperature,
+                    migration_temperature,
                     rng=spec.rng,
                 )
                 census.append([set(island) for island in islands])

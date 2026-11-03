@@ -56,7 +56,6 @@ async def test_generate_one_model():
         prompt_schema,
         llm_model,
         "explore",
-        1.0,
         spec=make_fake_spec(output_dir="test_output"),
         data={},
     )
@@ -95,7 +94,6 @@ async def test_generate_one_model_dynamic_params():
         prompt_schema,
         llm_model,
         "explore",
-        1.0,
         spec=make_fake_spec(output_dir="test_output"),
         data=data,
         output_schema=ModelSchemaDynamicDefaultParams,
@@ -148,7 +146,6 @@ async def test_generate_one_model_dynamic_params_evaluation_failure():
             prompt_schema,
             llm_model,
             "explore",
-            1.0,
             spec=make_fake_spec(output_dir="test_output"),
             data=data,
             output_schema=ModelSchemaDynamicDefaultParams,
@@ -188,7 +185,6 @@ async def test_generate_same_model():
         prompt_schema,
         llm_model,
         "explore",
-        1.0,
         spec=make_fake_spec(output_dir="test_output"),
     )
 
@@ -236,7 +232,6 @@ async def test_generate_distinct_models():
         prompt_schema,
         llm_models,
         "explore",
-        1.0,
         spec=make_fake_spec(output_dir="test_output"),
     )
 
@@ -283,7 +278,7 @@ async def test_generate_one_param_est():
         [],
         prompt_schema,
         llm_model,
-        config={"n_param_ests": 1, "param_est_temperature": 1.0},
+        config={"n_param_ests": 1},
     )
     assert generated_param_est == Program1.param_est
     assert program.code.model == model_code  # Check model code is unchanged
@@ -308,7 +303,7 @@ async def test_generate_param_ests_for_program():
         [],
         prompt_schema,
         llm_model,
-        config={"param_est_temperature": 1.0},
+        config={},
         n_param_ests=2,
     )
     assert program.code.param_est == [Program1.param_est, Program1.param_est]
@@ -341,7 +336,7 @@ async def test_generate_param_est():
         population,
         prompt_schema,
         llm_models,
-        config={"n_param_ests": 1, "param_est_temperature": 1.0},
+        config={"n_param_ests": 1},
     )
 
     # Check expected solutions
@@ -469,7 +464,6 @@ async def test_generate_one_model_with_real_llm():
         prompt_schema,
         llm=LLM_MODEL,
         mode="exploit",
-        temperature=1.0,
         spec=make_fake_spec(output_dir="test_output"),
         data={},
     )
@@ -507,7 +501,7 @@ async def test_generate_one_param_est_with_real_llm():
         [],
         prompt_schema,
         llm=LLM_MODEL,
-        config={"param_est_temperature": 1.0},
+        config={},
     )
     print("Generated param est code:\n", generated_param_est)
     assert "def parameter_estimator(data):" in generated_param_est
@@ -573,7 +567,6 @@ async def test_generate_one_model_with_ideas():
             prompt_schema,
             llm_model,
             "explore",
-            1.0,
             config={"idea_probability": 1.0},
             spec=make_fake_spec(output_dir="test_output"),
             data={},
@@ -594,7 +587,6 @@ async def test_generate_one_model_with_ideas():
             prompt_schema,
             llm_model,
             "explore",
-            1.0,
             config={"idea_probability": 0.0},
             spec=make_fake_spec(output_dir="test_output"),
             data={},
@@ -608,11 +600,8 @@ async def test_generate_one_model_with_ideas():
 
 
 @pytest.mark.asyncio
-async def test_generate_param_est_uses_configured_temperature():
-    """Verify that _generate_one_param_est passes the configured param_est_temperature to call_llm,
-
-    and raises a KeyError if param_est_temperature is not present in config.
-    """
+async def test_generate_param_est_does_not_pass_temperature():
+    """Parameter-estimator generation uses provider-default sampling settings."""
     from unittest.mock import AsyncMock, patch
 
     program = await generate_one_fake_model()
@@ -629,18 +618,6 @@ async def test_generate_param_est_uses_configured_temperature():
 
     with patch("edgar.llm.generate.call_llm", new_callable=AsyncMock) as mock_call:
         mock_call.return_value = None
-        # Test with custom param_est_temperature
-        await _generate_one_param_est(
-            program,
-            [],
-            prompt_schema,
-            llm_model,
-            config={"param_est_temperature": 1.7},
-        )
-        assert mock_call.call_args[1]["temperature"] == 1.7
-
-    # Test that KeyError is raised when param_est_temperature is missing from config
-    with pytest.raises(KeyError):
         await _generate_one_param_est(
             program,
             [],
@@ -648,3 +625,4 @@ async def test_generate_param_est_uses_configured_temperature():
             llm_model,
             config={},
         )
+        assert "temperature" not in mock_call.call_args[1]

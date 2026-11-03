@@ -13,7 +13,6 @@ def _llms_kwargs(**overrides):
         num_parents=2,
         retry=RetryConfig(),
         default_provider="google",
-        param_est_temperature=1.0,
         log_raw_llm_response=False,
         max_lines=50,
         swear_words=[],
@@ -48,6 +47,13 @@ def test_explicit_model_override_survives_provider():
     )
     assert cfg.model_llm == "gemini-2.5-pro"
     assert cfg.param_est_llm == "claude-sonnet-4-5"
+
+
+def test_legacy_param_est_temperature_is_ignored():
+    """Old user configs remain loadable but do not expose the removed setting."""
+    cfg = LLMsConfig(**_llms_kwargs(param_est_temperature=1.0))
+    assert "param_est_temperature" not in cfg.model_dump()
+    assert not hasattr(cfg, "param_est_temperature")
 
 
 try:
@@ -234,7 +240,6 @@ def test_load_perfect_config():
     assert config.llms.model_llm == 3 * ["gemini-2.5-flash"]
     assert config.llms.param_est_llm == "gemini-2.5-flash"
     assert config.llms.jax_model_translator_llm == "gemini-2.5-flash-lite"
-    assert config.llms.param_est_temperature == 1.0
     assert not config.llms.log_raw_llm_response
     assert config.llms.max_tokens == 10000
     assert config.llms.max_lines == 50

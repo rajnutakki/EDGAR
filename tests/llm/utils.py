@@ -67,7 +67,6 @@ async def generate_one_fake_model():
         prompt_schema,
         llm_model,
         "explore",
-        1.0,
         spec=make_fake_spec(),
         data={},
     )
@@ -91,7 +90,6 @@ async def generate_fake_models(n: int):
         prompt_schema,
         llm_models,
         "explore",
-        1.0,
         spec=make_fake_spec(),
         data={},
     )
@@ -115,7 +113,7 @@ async def generate_one_fake_param_est():
         [],
         prompt_schema,
         llm_model,
-        config={"n_param_ests": 1, "param_est_temperature": 1.0},
+        config={"n_param_ests": 1},
     )
     program.code.param_est = param_est
     return program
