@@ -29,7 +29,7 @@ default pytest configuration excludes tests marked `live` and `slow`; see
 
 ## Branch Structure
 
-Development is based on the [main branch](https://github.com/reillytilbury/EDGAR/tree/main).
+Development is based on the [main branch](https://github.com/rajnutakki/EDGAR/tree/main).
 Code on this branch should pass pre-commit checks and the `uv run pytest` unit tests.
 
 ## Testing and Validation
@@ -64,3 +64,6 @@ and navigate to the relevant run.
 
 We use [Google-style docstrings](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods).
 See `documentation_guidelines.md` for the repository's documentation requirements.
+The scheduled **Documentation review** workflow reviews `main`; it can also be run
+manually for a selected branch from the GitHub Actions tab. Review any proposed changes
+before merging them.
