@@ -7,8 +7,11 @@ gcp_launch.yaml
 gcp_launch.*.yaml
 !gcp_launch.example.yaml
 
+# Agent configurations
 CLAUDE.md
 .codex
+opencode.json
+AGENTS.md
 
 # output folders to ignore
 git rm --cached -r program_databases
