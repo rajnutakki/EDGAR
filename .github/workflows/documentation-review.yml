@@ -55,7 +55,7 @@ jobs:
       - name: Review and improve documentation
         run: |
           set -o pipefail
-          opencode run --agent documentation-reviewer --auto \
+          opencode run --model openai/gpt-6-luna --agent documentation-reviewer --auto \
             "Review and improve documentation on fork/$BASE_BRANCH as instructed. Do not perform GitHub operations. Finish with a Markdown report listing every documentation file changed and why; it will be included in the pull request description." \
             | tee "$RUNNER_TEMP/documentation-report.md"
 

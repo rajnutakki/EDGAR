@@ -56,7 +56,7 @@ jobs:
       - name: Generate branch review
         run: |
           set -o pipefail
-          opencode run --agent branch-reviewer --auto \
+          opencode run --model openai/gpt-6-luna --agent branch-reviewer --auto \
             "Review origin/main and fork/main, plus fork branches with commits in the last seven days. Focus recommendations on fork/$TARGET_BRANCH. Produce the required Markdown report. Do not change files." \
             | tee "$RUNNER_TEMP/branch-review.md"
 
