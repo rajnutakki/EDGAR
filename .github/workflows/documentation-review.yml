@@ -49,6 +49,7 @@ jobs:
           install -d -m 700 "$HOME/.local/share/opencode"
           printf '%s' "$OPENCODE_AUTH_JSON" > "$HOME/.local/share/opencode/auth.json"
           chmod 600 "$HOME/.local/share/opencode/auth.json"
+          opencode auth list
 
       - name: Create task branch
         run: git switch --create "$BRANCH_NAME"
