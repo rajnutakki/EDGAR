@@ -38,7 +38,8 @@ jobs:
           token: ${{ github.token }}
 
       - name: Install OpenCode
-        run: curl -fsSL https://opencode.ai/v2/install | bash
+        run: |
+          curl -fsSL https://opencode.ai/v2/install | bash -s -- --version 2.1.2
 
       - name: Restore OpenCode credentials
         env:
