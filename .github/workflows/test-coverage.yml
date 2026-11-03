@@ -67,7 +67,6 @@ jobs:
       - name: Improve tests
         run: |
           set -o pipefail
-          opencode models openai --refresh
           opencode run --model openai/gpt-6-luna --agent test-coverage --auto \
             "Improve tests on branch '$BASE_BRANCH' as instructed. Do not perform GitHub operations. Finish with the required Markdown report; it will be included in the pull request description." \
             | tee "$RUNNER_TEMP/test-coverage-report.md"
