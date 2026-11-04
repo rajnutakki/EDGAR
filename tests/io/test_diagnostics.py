@@ -6,6 +6,7 @@ from edgar.llm.prompt_schema import PromptSchema, _get_nested_attr
 from edgar.io.config import Config
 from edgar.io.task_spec import TaskSpec
 
+
 def test_base_diagnostics_defaults():
     diag = BaseDiagnostics()
     metrics = diag.compute_metrics({}, np.array([1.0, 2.0]))
@@ -32,6 +33,7 @@ def test_prompt_schema_nested_dict_attr():
     prompt = schema.build_prompt("explore", parent_programs=[program])
     assert "R2=0.85" in prompt
 
+
 def test_trial_variability_diagnostics_loading():
     config = Config.from_yaml("projects/trial_variability/config.yaml")
     spec = TaskSpec.from_config(config)
@@ -54,6 +56,7 @@ def test_trial_variability_diagnostics_loading():
     assert "r2_noise" in metrics
     assert "fano_slope_data" in metrics
     assert "fano_slope_pred" in metrics
+
 
 def test_population_save_load_diagnostics(tmp_path):
     pop = Population()
