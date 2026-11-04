@@ -45,10 +45,11 @@ include = ["edgar*", "edgar_experimental*"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
-addopts = "-m 'not live and not slow'" #By default do not use live API calls or run slow tests
+addopts = "-m 'not live and not slow and not local'" # Exclude API calls, slow tests, and local-data tests by default; opt in with -m.
 markers = [
     "live: tests that make real LLM API calls",
-    "slow: tests that take a long time"
+    "slow: tests that take a long time",
+    "local: tests that require locally available data (run explicitly with -m local)"
 ]
 
 [dependency-groups]

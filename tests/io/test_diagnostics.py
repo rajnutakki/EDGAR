@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from edgar.projects.diagnostics import BaseDiagnostics
 from edgar.evolution.program import Program, BirthCertificate
 from edgar.evolution.population import Population
@@ -34,7 +35,9 @@ def test_prompt_schema_nested_dict_attr():
     assert "R2=0.85" in prompt
 
 
+@pytest.mark.local
 def test_trial_variability_diagnostics_loading():
+    """Load trial-variability diagnostics using locally available project data."""
     config = Config.from_yaml("projects/trial_variability/config.yaml")
     spec = TaskSpec.from_config(config)
 
