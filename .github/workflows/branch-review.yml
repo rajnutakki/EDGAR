@@ -42,7 +42,11 @@ jobs:
           git fetch --prune fork '+refs/heads/*:refs/remotes/fork/*'
 
       - name: Install OpenCode
-        run: curl -fsSL https://opencode.ai/v2/install | bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://opencode.ai/v2/install \
+            | bash -s -- --version 2.1.2
+          "$HOME/.opencode/bin/opencode" --version
 
       - name: Import OpenCode credentials
         env:
