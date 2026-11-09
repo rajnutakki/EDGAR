@@ -1,7 +1,8 @@
 # ruff: noqa: F841
 
 import pytest
-from edgar.io.config import Config, LLMsConfig, RetryConfig, ScoringConfig
+from edgar.io.config import Config, LLMsConfig, RetryConfig, ScoringConfig, RunConfig
+import yaml
 from pydantic import ValidationError
 from edgar.io.task_spec import TaskSpec
 import jax
@@ -483,3 +484,68 @@ def test_config_taskspec_round_trip(tmp_path):
     config_from_taskspec = Config.from_taskspec(saved_taskspec)
     a, b = config.model_dump(), config_from_taskspec.model_dump()
     assert a == b, "\n".join(f"  {k}: {a[k]!r} != {b[k]!r}" for k in a if a[k] != b[k])
+
+
+@pytest.mark.parametrize(
+    "stages",
+    [
+        ["generate_models"],
+        ["generate_models", "generate_param_ests"],
+        ["generate_models", "translate_programs"],
+        ["generate_models", "generate_param_ests", "translate_programs"],
+    ],
+)
+def test_generation_stages_round_trip(tmp_path, stages):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "config.yaml").write_text(
+        yaml.safe_dump({"run": {"generation_stages": stages}})
+    )
+    config = Config.from_yaml(project / "config.yaml")
+    assert config.run.generation_stages == stages
+    spec = TaskSpec.from_config(Config.from_yaml("tests/io/test_task/config.yaml"))
+    spec.run["generation_stages"] = stages
+    saved = spec.save(tmp_path)
+    assert Config.from_taskspec(saved).run.generation_stages == stages
+
+
+@pytest.mark.parametrize(
+    "stages",
+    [
+        [],
+        ["translate_programs"],
+        ["generate_models", "generate_models"],
+        ["generate_models", "translate_programs", "generate_param_ests"],
+        ["generate_models", "unknown"],
+        "generate_models",
+        None,
+    ],
+)
+def test_invalid_generation_stages(stages):
+    with pytest.raises(ValidationError):
+        RunConfig(random_seed=None, generation_stages=stages)
+
+
+def test_generation_stages_required_without_yaml():
+    with pytest.raises(ValidationError):
+        RunConfig(random_seed=None)
+    first = Config.from_yaml("tests/io/test_task/config.yaml")
+    second = Config.from_yaml("tests/io/test_task/config.yaml")
+    first.run.generation_stages.pop()
+    assert len(second.run.generation_stages) == 3
+
+
+def test_legacy_task_spec_uses_yaml_run_defaults(tmp_path):
+    spec = TaskSpec.from_config(Config.from_yaml("tests/io/test_task/config.yaml"))
+    saved = spec.save(tmp_path)
+    record = yaml.safe_load(saved.read_text())
+    record["run"].pop("generation_stages")
+    saved.chmod(0o644)
+    saved.write_text(yaml.safe_dump(record))
+    config = Config.from_taskspec(saved)
+    assert config.run.random_seed == 42
+    assert config.run.generation_stages == [
+        "generate_models",
+        "generate_param_ests",
+        "translate_programs",
+    ]

@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 # Filters — which programs need work at each stage
 # ---------------------------------------------------------------------------
 def _needs_model_code(program: Program) -> bool:
-    """Checks if a program requires its numpy model code to be generated.
+    """Checks if a program requires its original model code to be generated.
 
     Args:
         program: The program to check.
@@ -76,8 +76,8 @@ def _needs_model_translation(program: Program) -> bool:
 def mark_failed_generations(population: Population) -> None:
     """Marks alive programs without model or JAX model code as "failed_generation".
 
-    Run after the generation and translation stages. A program left without numpy
-    model or JAX model code (e.g. because the LLM response was truncated) cannot be
+    Run after the generation stages and model finalization. A program left without
+    original model or executable JAX source (e.g. because an LLM response was truncated) cannot be
     scored and must not be sampled as a parent or migrant. Missing parameter
     estimators are not a failure: gradient descent is then initialised from the
     program's default params. The status is final: generation stages only work on
@@ -93,6 +93,24 @@ def mark_failed_generations(population: Population) -> None:
         code = program.code
         if code.model is None or code.model_jax is None:
             program.status = "failed_generation"
+
+
+def finalize_model_code(population: Population, *, translation_required: bool) -> None:
+    """Make original model source available to scoring in direct-JAX mode.
+
+    Existing executable source is preserved. When translation is requested, missing
+    translations remain missing and are handled by ``mark_failed_generations``.
+    This does not validate or compile the source; scoring handles invalid code.
+    """
+    if translation_required:
+        return
+    for program in population:
+        if (
+            program.status == "alive"
+            and program.code.model_jax is None
+            and program.code.model is not None
+        ):
+            program.code.model_jax = program.code.model
 
 
 def _filter_programs(
@@ -244,7 +262,7 @@ async def generate_models(
     data: dict | None = None,
     output_schema: type[BaseModel] = ModelSchema,
 ) -> None:
-    """Asynchronously generates numpy model code for programs needing it within a population.
+    """Asynchronously generates model code for programs needing it within a population.
 
     This function identifies programs without model code using `_needs_model_code`,
     resolves their parent programs, and then concurrently dispatches asynchronous LLM calls

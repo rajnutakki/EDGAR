@@ -30,10 +30,11 @@ from .evolution.island import (
 from .llm.generate import (
     generate_models,
     generate_param_ests,
+    finalize_model_code,
     mark_failed_generations,
     translate_programs,
 )
-from .io.config import RetryConfig
+from .io.config import RetryConfig, RunConfig, GenerationStage
 from .scoring.scoring import rank, score
 from .jax.utils import _to_numpy
 from .io.plotting import generate_program_images
@@ -63,6 +64,56 @@ t_migrate = timed("migrate", quiet=True)(migrate)
 t_score_validate = timed("score_validate")(score)
 
 
+async def _execute_generation_stage(
+    stage: GenerationStage,
+    population: Population,
+    spec: TaskSpec,
+    llms: object,
+    gen: int,
+    mode: str,
+    config: dict,
+    retry_config: RetryConfig,
+    data: dict,
+    n_spawn: int,
+) -> None:
+    """Dispatch one configured LLM stage through its existing timed alias."""
+    if stage == "generate_models":
+        await t_generate_models(
+            population,
+            spec.prompt_schemas.model,
+            llms.model[gen % len(llms.model)]
+            if isinstance(llms.model, list)
+            else llms.model,
+            mode,
+            config=config,
+            spec=spec,
+            data=data,
+            output_schema=spec.response_schemas.model,
+            n_items=n_spawn,
+        )
+    elif stage == "generate_param_ests":
+        await t_generate_param_ests(
+            population,
+            spec.prompt_schemas.param_est,
+            llms.param_est,
+            config,
+            output_schema=spec.response_schemas.param_est,
+            n_items=n_spawn,
+        )
+    elif stage == "translate_programs":
+        await t_translate_programs(
+            population,
+            spec.prompt_schemas.jax_model,
+            llms.model_jax,
+            retry_config=retry_config,
+            max_tokens=config.get("max_tokens"),
+            output_schema=spec.response_schemas.jax_model,
+            n_items=n_spawn,
+        )
+    else:
+        raise ValueError(f"Unknown generation stage: {stage}")
+
+
 async def run(
     spec: TaskSpec,
     log_level: str = "compact",
@@ -82,16 +133,14 @@ async def run(
     2.  **Data Loading**: Loads the scientific problem data into `X_discover`, `X_validate`,
         and `X_eval` splits using the `spec.load_data_fn`.
     3.  **Seed Phase**: Initializes the `Population` with seed programs. These programs are
-        translated into JAX, scored on the `discover` split, and their initial fit and
+        translated into JAX when configured (otherwise used directly), scored on the `discover` split, and their initial fit and
         trajectory visualizations are generated. The initial `Population` and `Island`
         census are then saved.
     4.  **Generational Loop**: For each generation:
         *   New program variants are `spawn`ed on islands from the current population,
             selecting parents using Boltzmann or uniform sampling.
-        *   LLMs are called to generate new model architectures (`generate_models`) and
-            parameter estimation logic (`generate_param_ests`) for the spawned programs.
-            Image feedback is provided to the LLMs.
-        *   Programs are `translate`d from numpy to JAX-compatible code.
+        *   Configured LLM stages generate models, optional parameter estimators, and
+            optional JAX translations. Image feedback is provided to model generation.
         *   Programs are `score`ed on the `discover` split, involving parameter estimation
             and gradient descent. Program fit and trajectory images are generated.
         *   Evolutionary operations are applied: programs are `deduplicate`d within and
@@ -130,6 +179,9 @@ async def run(
         None. The function's primary effects are side effects: creating output files, updating
         status, and logging.
     """
+    # Validate even manually constructed TaskSpecs before saving or calling LLMs.
+    stages = RunConfig.model_validate(spec.run).generation_stages
+    translation_required = "translate_programs" in stages
     log, resume = _init_env(spec, resume_from, log_level)
     (
         population,
@@ -163,19 +215,24 @@ async def run(
             _log_startup(
                 log, spec, resume, population, census, start_gen, n_dropped, metrics
             )
+            print_and_log(log, f"Generation stages: {', '.join(stages)}")
 
             if not resume:
                 # ── Seed phase ──
                 metrics.start_generation(-1)
                 islands = t_seed(population, spec.seed_programs, n_islands)
-                await t_translate_seeds(
-                    population,
-                    spec.prompt_schemas.jax_model,
-                    spec.llms["jax_model_translator_llm"],
-                    retry_config=retry_config,
-                    max_tokens=config.get("max_tokens"),
-                    output_schema=spec.response_schemas.jax_model,
-                    n_items=len(spec.seed_programs),
+                if translation_required:
+                    await t_translate_seeds(
+                        population,
+                        spec.prompt_schemas.jax_model,
+                        spec.llms["jax_model_translator_llm"],
+                        retry_config=retry_config,
+                        max_tokens=config.get("max_tokens"),
+                        output_schema=spec.response_schemas.jax_model,
+                        n_items=len(spec.seed_programs),
+                    )
+                finalize_model_code(
+                    population, translation_required=translation_required
                 )
                 t_mark_failed_generations(population)
                 t_score_seeds(
@@ -224,35 +281,21 @@ async def run(
                     rng=spec.rng,
                 )
 
-                await t_generate_models(
-                    population,
-                    spec.prompt_schemas.model,
-                    llms.model[gen % len(llms.model)]
-                    if isinstance(llms.model, list)
-                    else llms.model,
-                    mode,
-                    config=config,
-                    spec=spec,
-                    data=X_discover[1],
-                    output_schema=spec.response_schemas.model,
-                    n_items=n_spawn,
-                )
-                await t_generate_param_ests(
-                    population,
-                    spec.prompt_schemas.param_est,
-                    llms.param_est,
-                    config,
-                    output_schema=spec.response_schemas.param_est,
-                    n_items=n_spawn,
-                )
-                await t_translate_programs(
-                    population,
-                    spec.prompt_schemas.jax_model,
-                    llms.model_jax,
-                    retry_config=retry_config,
-                    max_tokens=config.get("max_tokens"),
-                    output_schema=spec.response_schemas.jax_model,
-                    n_items=n_spawn,
+                for stage in stages:
+                    await _execute_generation_stage(
+                        stage,
+                        population,
+                        spec,
+                        llms,
+                        gen,
+                        mode,
+                        config,
+                        retry_config,
+                        X_discover[1],
+                        n_spawn,
+                    )
+                finalize_model_code(
+                    population, translation_required=translation_required
                 )
                 t_mark_failed_generations(population)
                 t_score(
