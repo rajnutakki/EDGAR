@@ -4,6 +4,7 @@ run:
 
 io:
   data_path: "/home/rajah/projects/synaptic_transmission/dataset/data.npz"
+  save_path: "/home/rajah/projects/synaptic_transmission/edgar_results"
 
 project_params:
   discovery_equilibration_ms: 30000.0
@@ -16,6 +17,8 @@ evolution:
   critical_population_size: 6
   n_migrants: 1
   topology: [1, 0]
+  exploit_point: 1
+  dedup_loss_tol: 0.001
 
 llms:
   num_parents: 2
