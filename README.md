@@ -303,6 +303,29 @@ def apply_model(model_fn, data, params):
 
 A custom `apply_model` must be JAX-compatible.
 
+#### Optional custom fingerprints
+
+EDGAR normally builds fingerprints with its built-in `eval_fingerprint`, which
+selects fitted parameters using `X_eval["_sample_indices"]` and returns the
+model output. A project may replace that behavior by defining this optional
+function in `data_loader/load_data.py`:
+
+```python
+def eval_fingerprint(model_fn, params, X_eval, apply_model_fn):
+    """Return a nonempty, finite numeric array for model comparison."""
+    # The helper owns parameter selection (including _sample_indices), model
+    # evaluation, and fingerprint construction.
+    return builtin_eval_fingerprint(model_fn, params, X_eval, apply_model_fn)
+```
+
+This is a full replacement: custom helpers receive the optimized, batched
+parameter pytree and must select the intended samples themselves. For the
+example above, import the built-in helper as `builtin_eval_fingerprint` in the
+project's loader. Returned arrays must have consistent shape and element order
+for every candidate model; EDGAR flattens them for cosine-similarity
+deduplication. Invalid outputs and helper errors only omit the fingerprint and
+do not invalidate an otherwise successful score. No YAML setting is required.
+
 For example, a dynamical model could scan over each
 sample (timestep):
 

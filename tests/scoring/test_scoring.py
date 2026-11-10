@@ -59,6 +59,15 @@ def sample_scaled_apply_model(model_fn, data, params):
     return jax.vmap(apply_one)(data, params)
 
 
+def parameter_fingerprint(model_fn, params, X_eval, apply_model_fn):
+    """Test override proving scoring passes the unselected batched parameters."""
+    return params["w"]
+
+
+def invalid_dict_fingerprint(model_fn, params, X_eval, apply_model_fn):
+    return {"output": np.ones(1)}
+
+
 def _make_basic_data(y_offset=0.0):
     x = jnp.array([1.0, 2.0, 3.0])
     return {
@@ -311,6 +320,39 @@ def test_score_one_model_perfect_fit():
     final_loss, *_, outcome = _score_one_model(program, data, loss_fn, BASE_CONFIG)
     assert final_loss < 1e-4
     assert outcome == "ok"
+
+
+def test_custom_fingerprint_is_called_in_scoring_subprocess():
+    program = _make_program(FAST_MODEL_CODE)
+    data = (_make_data(), _make_data())
+    eval_data = {**data[1], "_sample_indices": np.array([0])}
+    result = _score_one_model(
+        program,
+        data,
+        loss_fn,
+        BASE_CONFIG,
+        X_eval=eval_data,
+        fingerprint_fn=parameter_fingerprint,
+    )
+    assert result[-1] == "ok"
+    assert result[2].shape == (3, 1)  # all batched parameter rows were passed through
+
+
+def test_invalid_custom_fingerprint_does_not_invalidate_score():
+    program = _make_program(FAST_MODEL_CODE)
+    data = (_make_data(), _make_data())
+    eval_data = {**data[1], "_sample_indices": np.array([0])}
+    result = _score_one_model(
+        program,
+        data,
+        loss_fn,
+        BASE_CONFIG,
+        X_eval=eval_data,
+        fingerprint_fn=invalid_dict_fingerprint,
+    )
+    assert result[-1] == "ok"
+    assert np.isfinite(result[0])
+    assert result[2] is None
 
 
 def test_score_one_model_scipy_optimizer():
@@ -844,6 +886,7 @@ def test_score_forwards_custom_apply_model(monkeypatch):
     """Population scoring passes a custom apply function to model scoring."""
     pop = Population()
     pop.add(_make_program(FAST_MODEL_CODE))
+    pop[0].eval_fingerprint = np.array([3.0, 4.0])
     data = (_make_data(), _make_data())
     received = {}
 
@@ -857,6 +900,7 @@ def test_score_forwards_custom_apply_model(monkeypatch):
         apply_model_fn=apply_model_plain,
         diagnostics=None,
         cpu_affinity=None,
+        fingerprint_fn=None,
     ):
         received["program"] = program
         received["data"] = scoring_data
@@ -865,6 +909,7 @@ def test_score_forwards_custom_apply_model(monkeypatch):
         received["X_eval"] = X_eval
         received["split"] = split
         received["apply_model_fn"] = apply_model_fn
+        received["fingerprint_fn"] = fingerprint_fn
 
         return (
             0.0,
@@ -892,6 +937,7 @@ def test_score_forwards_custom_apply_model(monkeypatch):
         loss_fn,
         split="discover",
         apply_model_fn=sample_scaled_apply_model,
+        fingerprint_fn=parameter_fingerprint,
     )
 
     assert received["program"] is pop[0]
@@ -901,6 +947,8 @@ def test_score_forwards_custom_apply_model(monkeypatch):
     assert received["X_eval"] is None
     assert received["split"] == "discover"
     assert received["apply_model_fn"] is sample_scaled_apply_model
+    assert received["fingerprint_fn"] is parameter_fingerprint
+    assert np.array_equal(pop[0].eval_fingerprint, [3.0, 4.0])
 
     assert pop[0].program_losses.discover.init == 1.0
     assert pop[0].program_losses.discover.final == 0.0
