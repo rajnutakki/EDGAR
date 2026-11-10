@@ -21,8 +21,9 @@ from edgar.llm.generate import build_generation_stages
     ],
 )
 async def test_build_generation_stages_binds_arguments(names):
-    schemas = SimpleNamespace(model=object(), param_est=object(), jax_model=object())
-    spec = SimpleNamespace(prompt_schemas=schemas, response_schemas=schemas)
+    prompts = SimpleNamespace(model=object(), param_est=object(), jax_model=object())
+    responses = SimpleNamespace(model=object(), param_est=object(), jax_model=object())
+    spec = SimpleNamespace(prompt_schemas=prompts, response_schemas=responses)
     llms = LLMs(model="model", param_est="estimator", model_jax="translator")
     retry = RetryConfig()
     config = {"max_tokens": 123, "retry_config": retry}
@@ -44,32 +45,32 @@ async def test_build_generation_stages_binds_arguments(names):
 
         models.assert_awaited_once_with(
             population,
-            schemas.model,
+            prompts.model,
             llms.model,
             "exploit",
             config=config,
             spec=spec,
             data=data,
-            output_schema=schemas.model,
+            output_schema=responses.model,
         )
         if "generate_param_ests" in names:
             estimators.assert_awaited_once_with(
                 population,
-                schemas.param_est,
+                prompts.param_est,
                 llms.param_est,
                 config,
-                output_schema=schemas.param_est,
+                output_schema=responses.param_est,
             )
         else:
             estimators.assert_not_called()
         if "translate_programs" in names:
             translate.assert_awaited_once_with(
                 population,
-                schemas.jax_model,
+                prompts.jax_model,
                 llms.model_jax,
                 retry_config=retry,
                 max_tokens=123,
-                output_schema=schemas.jax_model,
+                output_schema=responses.jax_model,
             )
         else:
             translate.assert_not_called()

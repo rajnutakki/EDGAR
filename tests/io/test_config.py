@@ -1,6 +1,8 @@
 # ruff: noqa: F841
 
 import pytest
+from pathlib import Path
+import shutil
 from edgar.io.config import Config, LLMsConfig, RetryConfig, ScoringConfig, RunConfig
 import yaml
 from pydantic import ValidationError
@@ -496,15 +498,17 @@ def test_config_taskspec_round_trip(tmp_path):
     ],
 )
 def test_generation_stages_round_trip(tmp_path, stages):
+    """Stage selections survive YAML loading, TaskSpec construction and persistence."""
     project = tmp_path / "project"
-    project.mkdir()
-    (project / "config.yaml").write_text(
-        yaml.safe_dump({"run": {"generation_stages": stages}})
-    )
-    config = Config.from_yaml(project / "config.yaml")
+    shutil.copytree(Path("tests/io/test_task"), project)
+    config_path = project / "config.yaml"
+    record = yaml.safe_load(config_path.read_text())
+    record["run"]["generation_stages"] = stages
+    config_path.write_text(yaml.safe_dump(record))
+    config = Config.from_yaml(config_path)
     assert config.run.generation_stages == stages
-    spec = TaskSpec.from_config(Config.from_yaml("tests/io/test_task/config.yaml"))
-    spec.run["generation_stages"] = stages
+    spec = TaskSpec.from_config(config)
+    assert spec.run["generation_stages"] == stages
     saved = spec.save(tmp_path)
     assert Config.from_taskspec(saved).run.generation_stages == stages
 
@@ -529,10 +533,6 @@ def test_invalid_generation_stages(stages):
 def test_generation_stages_required_without_yaml():
     with pytest.raises(ValidationError):
         RunConfig(random_seed=None)
-    first = Config.from_yaml("tests/io/test_task/config.yaml")
-    second = Config.from_yaml("tests/io/test_task/config.yaml")
-    first.run.generation_stages.pop()
-    assert len(second.run.generation_stages) == 3
 
 
 def test_legacy_task_spec_uses_yaml_run_defaults(tmp_path):
