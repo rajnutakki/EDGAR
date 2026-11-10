@@ -131,7 +131,7 @@ class Diagnostics(BaseDiagnostics):
                             linewidth=1.3,
                         )
                     state_ax.set_xlabel("Time before first pulse (ms)")
-                    state_ax.set_ylabel(f"{name:.20}\nState")
+                    state_ax.set_ylabel(f"{name:.20}...\nState")
                     state_ax.legend(fontsize="small", ncol=2)
 
                     time = np.asarray(data["time"])[column, 0]
@@ -163,7 +163,7 @@ class Diagnostics(BaseDiagnostics):
                         predicted,
                         "o-",
                         color=colour,
-                        label=f"{name:.20}",
+                        label=f"{name:.20}...",
                         linewidth=1.5,
                         markersize=4,
                     )
