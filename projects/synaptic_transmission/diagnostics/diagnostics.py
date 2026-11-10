@@ -13,6 +13,7 @@ import numpy as np
 
 from edgar.projects.diagnostics import BaseDiagnostics
 
+
 class Diagnostics(BaseDiagnostics):
     def plot_model_fits(
         self,
@@ -47,18 +48,26 @@ class Diagnostics(BaseDiagnostics):
 
         target = np.asarray(data["release"])
         if target.ndim != 3 or target.shape[1] != 1:
-            raise ValueError("Expected a test split with one held-out protocol per fold")
+            raise ValueError(
+                "Expected a test split with one held-out protocol per fold"
+            )
         n_folds = target.shape[0]
-        names = program_names if program_names is not None else [p.name for p in programs]
+        names = (
+            program_names if program_names is not None else [p.name for p in programs]
+        )
         parameter_sets = params if params is not None else [p.params for p in programs]
         if len(names) != len(programs) or len(parameter_sets) != len(programs):
-            raise ValueError("params and program_names must match the number of programs")
+            raise ValueError(
+                "params and program_names must match the number of programs"
+            )
 
         n_models = len(programs)
         model_colours = plt.get_cmap("tab10")
         state_colours: dict[str, Any] = {}
         fig, axes = plt.subplots(
-            n_models + 2, n_folds, squeeze=False,
+            n_models + 2,
+            n_folds,
+            squeeze=False,
             figsize=(4.5 * n_folds, 2.7 * n_models + 5),
             gridspec_kw={"height_ratios": [1.2] * n_models + [1.4, 0.7]},
             layout="constrained",
@@ -88,41 +97,84 @@ class Diagnostics(BaseDiagnostics):
 
                 for column in range(n_folds):
                     state_ax = axes[model_index, column]
-                    equilibration = float(np.asarray(data["_equilibration_time"])[column, 0])
+                    equilibration = float(
+                        np.asarray(data["_equilibration_time"])[column, 0]
+                    )
                     n_equilibration = int(round(equilibration / dt))
                     # Downsample display only, retaining both ends; simulation
                     # still uses every step of the scoring rollout.
-                    indices = np.unique(np.linspace(
-                        0, n_equilibration, min(n_equilibration + 1, 1500), dtype=int
-                    ))
+                    indices = np.unique(
+                        np.linspace(
+                            0,
+                            n_equilibration,
+                            min(n_equilibration + 1, 1500),
+                            dtype=int,
+                        )
+                    )
                     state_time = indices * dt - equilibration
                     fold_params = {key: value[column] for key, value in fitted.items()}
                     initial = model_fn.INITIAL_STATE(fold_params)
                     for key in state_keys:
                         # Rollout index zero is the state AFTER the first step.
                         trace = np.asarray(output[key])[column, 0]
-                        values = np.concatenate((
-                            np.asarray(initial[key]).reshape(1), trace[:n_equilibration]
-                        ))
-                        state_ax.plot(state_time, values[indices],
-                                      color=state_colours[key], label=key, linewidth=1.3)
+                        values = np.concatenate(
+                            (
+                                np.asarray(initial[key]).reshape(1),
+                                trace[:n_equilibration],
+                            )
+                        )
+                        state_ax.plot(
+                            state_time,
+                            values[indices],
+                            color=state_colours[key],
+                            label=key,
+                            linewidth=1.3,
+                        )
                     state_ax.set_xlabel("Time before first pulse (ms)")
                     state_ax.set_ylabel(f"{name:.20}\nState")
                     state_ax.legend(fontsize="small", ncol=2)
 
                     time = np.asarray(data["time"])[column, 0]
-                    observation_index = np.asarray(data["_observation_index"])[column, 0]
+                    observation_index = np.asarray(data["_observation_index"])[
+                        column, 0
+                    ]
                     observed = target[column, 0]
-                    valid = (observation_index >= 0) & np.isfinite(time) & np.isfinite(observed)
+                    valid = (
+                        (observation_index >= 0)
+                        & np.isfinite(time)
+                        & np.isfinite(observed)
+                    )
                     time, observed = time[valid], observed[valid]
                     predicted = release[column, 0, observation_index[valid]]
                     release_ax, residual_ax = axes[-2, column], axes[-1, column]
                     if model_index == 0:
-                        release_ax.plot(time, observed, "o-", color="black",
-                                        markersize=3, linewidth=1, label="Data", zorder=5)
-                    release_ax.plot(time, predicted, color=colour, label=f"{name:.20}", linewidth=1.5)
-                    residual_ax.plot(time, np.abs(predicted - observed),
-                                     color=colour, linewidth=1.3)
+                        release_ax.plot(
+                            time,
+                            observed,
+                            "x-",
+                            color="black",
+                            markersize=5,
+                            linewidth=1,
+                            label="Data",
+                            zorder=5,
+                        )
+                    release_ax.plot(
+                        time,
+                        predicted,
+                        "o-",
+                        color=colour,
+                        label=f"{name:.20}",
+                        linewidth=1.5,
+                        markersize=4,
+                    )
+                    residual_ax.plot(
+                        time,
+                        np.abs(predicted - observed),
+                        "o-",
+                        color=colour,
+                        linewidth=1.3,
+                        markersize=4,
+                    )
                     release_ax.set_ylabel("Release")
                     residual_ax.set_ylabel("|Release Residual|")
                     residual_ax.set_xlabel("Time from first pulse (ms)")
@@ -136,6 +188,7 @@ class Diagnostics(BaseDiagnostics):
             fig.savefig(save_path, bbox_inches="tight", dpi=120)
         finally:
             plt.close(fig)
+
 
 def plot_model_fits(*args, **kwargs):
     """Module-level compatibility wrapper for Diagnostics.plot_model_fits."""

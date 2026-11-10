@@ -2,6 +2,7 @@ import jax.numpy as jnp
 
 DT = 0.1  # integration step, ms (matches the data-generating grid)
 
+
 def initial_state(params) -> dict:
     return {
         "ES": params["Ntotal"],
@@ -13,21 +14,25 @@ def initial_state(params) -> dict:
 
 
 def model(hidden_state, y_prev, params):
-    """Neher model of synaptic transmission with multi-step vesicle priming and calcium dynamics.
+    """Coupled-state response model with stimulus-dependent transitions.
 
-    Reservoirs:
-        - ES: empty release sites
-        - LS: synaptic vesicles in loosely docked state
-        - TS: synaptic vesicles in tightly docked state
-        - LTS: synaptic vesicles in labile tightly docked state
-        - Ca: AP-induced effective [Ca2+] transient above basal rest (uM)
+    State variables:
+        ES: available capacity that exchanges with LS.
+        LS: intermediate state that supplies TS and LTS.
+        TS: response-generating state depleted by stimulus events.
+        LTS: additional response-generating state populated by stimulus events.
+        Ca: stimulus-driven modulation signal with exponential decay.
 
     Inputs:
-        hidden_state: dict with keys {"ES", "LS", "TS", "Ca", "LTS"}
-        y_prev: dict with keys:
-            - "stim_prev" (or "P_prev"): action potential stimulus at t-1 (1 if pulse present, 0 otherwise)
-            - "release_prev": previous observed release (optional)
-        params: dict of learnable model parameters
+        hidden_state: dict with keys {"ES", "LS", "TS", "Ca", "LTS"}.
+        y_prev: dict containing:
+            stim_prev: binary stimulus indicator for the current step;
+                P_prev is accepted as an alternative key.
+            release_prev: previous model-predicted response (unused here).
+        params: dict of free model parameters.
+
+    Returns:
+        Updated hidden state and the response amplitude for the current step.
     """
     ES_prev = hidden_state["ES"]
     LS_prev = hidden_state["LS"]
@@ -50,13 +55,13 @@ def model(hidden_state, y_prev, params):
     s1 = params["s1"]
     s2 = params["s2"]
 
-    # Calcium dynamics and transition rate constants
+    # Modulation-dependent transition rate constants
     sigma2 = s2 * cadecay / deltaca
     sigma1 = s1 * cadecay / deltaca
     k2 = k2rest + sigma2 * Ca_prev
     k1 = (k1rest + sigma1 * Ca_prev) / (1.0 + Ca_prev / k_1)
 
-    # Evoked release and transition by stimulus
+    # Event response and stimulus-driven state transfer
     release1 = Pf * TS_prev * P
     release2 = Pf * LTS_prev * P
     release = release1 + release2
