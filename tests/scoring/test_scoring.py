@@ -336,6 +336,7 @@ def test_custom_fingerprint_is_called_in_scoring_subprocess():
     )
     assert result[-1] == "ok"
     assert result[2].shape == (3, 1)  # all batched parameter rows were passed through
+    np.testing.assert_array_equal(result[2], result[3]["w"])
 
 
 def test_invalid_custom_fingerprint_does_not_invalidate_score():
@@ -352,6 +353,87 @@ def test_invalid_custom_fingerprint_does_not_invalidate_score():
     )
     assert result[-1] == "ok"
     assert np.isfinite(result[0])
+    assert result[2] is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, {}, [], [np.nan], [np.inf], ["text"], [True], np.array([1], dtype=object)],
+)
+def test_worker_rejects_invalid_fingerprint_outputs(monkeypatch, value):
+    """Invalid optional outputs leave fitted parameters and sample losses intact."""
+    from queue import Queue
+
+    monkeypatch.setattr(
+        "edgar.scoring.scoring._optimize",
+        lambda model, loss, inits, data, config, apply: (inits, None),
+    )
+
+    def fingerprint(model_fn, params, X_eval, apply_model_fn):
+        return value
+
+    queue = Queue()
+    data = _make_data()
+    _worker(
+        queue,
+        cloudpickle.dumps(_make_program(FAST_MODEL_CODE)),
+        (data, data),
+        cloudpickle.dumps(loss_fn),
+        BASE_CONFIG,
+        {**data, "_sample_indices": np.arange(3)},
+        "discover",
+        apply_model_fn_bytes,
+        fingerprint_fn_bytes=cloudpickle.dumps(fingerprint),
+    )
+    result = queue.get_nowait()
+    assert np.isfinite(result[0])
+    assert result[2] is None
+    assert result[3] is not None
+    assert np.all(np.isfinite(result[4]))
+
+
+@pytest.mark.parametrize("has_eval_data", [False, True])
+def test_failing_custom_fingerprint_is_optional(tmp_path, has_eval_data):
+    marker = tmp_path / "fingerprint-called"
+
+    def fingerprint(model_fn, params, X_eval, apply_model_fn):
+        marker.write_text("called")
+        raise RuntimeError("broken optional helper")
+
+    data = _make_data()
+    result = _score_one_model(
+        _make_program(FAST_MODEL_CODE),
+        (data, data),
+        loss_fn,
+        BASE_CONFIG,
+        X_eval=data if has_eval_data else None,
+        fingerprint_fn=fingerprint,
+    )
+    assert result[-1] == "ok"
+    assert result[2] is None
+    assert np.all(np.isfinite(result[4]))
+    assert marker.exists() is has_eval_data
+
+
+def test_unserializable_custom_fingerprint_does_not_invalidate_score():
+    class UnserializableFingerprint:
+        def __reduce__(self):
+            raise TypeError("cannot serialize helper")
+
+        def __call__(self, *args):
+            return [1.0]
+
+    data = _make_data()
+    result = _score_one_model(
+        _make_program(FAST_MODEL_CODE),
+        (data, data),
+        loss_fn,
+        BASE_CONFIG,
+        X_eval={**data, "_sample_indices": np.arange(3)},
+        fingerprint_fn=UnserializableFingerprint(),
+    )
+    assert result[-1] == "ok"
+    # Do not silently fall back to built-in comparison semantics.
     assert result[2] is None
 
 

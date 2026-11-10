@@ -355,6 +355,9 @@ def _are_duplicates(
     3. The cosine similarity of their `eval_fingerprint` arrays is greater than or equal
        to a specified `cosine_tol`.
 
+    Fingerprints are flattened and promoted to at least float64 precision before
+    comparison to avoid integer overflow and low-precision dot-product overflow.
+
     Args:
         p_i: The first `Program` object to compare.
         p_j: The second `Program` object to compare.
@@ -381,6 +384,8 @@ def _are_duplicates(
     y_j = p_j.eval_fingerprint.flatten()
     if y_i.shape != y_j.shape:
         return False
+    y_i = y_i.astype(np.result_type(y_i.dtype, np.float64), copy=False)
+    y_j = y_j.astype(np.result_type(y_j.dtype, np.float64), copy=False)
     cosine = np.dot(y_i, y_j) / (np.linalg.norm(y_i) * np.linalg.norm(y_j) + 1e-6)
     return bool(cosine >= cosine_tol)
 

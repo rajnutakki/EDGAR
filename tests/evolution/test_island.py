@@ -44,6 +44,15 @@ def test_incompatible_fingerprint_shapes_are_not_duplicates():
     assert not _are_duplicates(first, second, loss_tol=0.01, cosine_tol=0.95)
 
 
+@pytest.mark.parametrize("dtype, value", [(np.int8, 100), (np.float16, 1000)])
+def test_identical_numeric_fingerprints_do_not_overflow(dtype, value):
+    first = make_fingerprint_program([1.0, 1.0])
+    second = make_fingerprint_program([1.0, 1.0])
+    first.eval_fingerprint = np.full(2, value, dtype=dtype)
+    second.eval_fingerprint = first.eval_fingerprint.copy()
+    assert _are_duplicates(first, second, loss_tol=0.01, cosine_tol=0.95)
+
+
 def test_spawn():
     population = Population()
     seed_programs = make_seeds()
