@@ -15,6 +15,8 @@ import jax.numpy as jnp
 import numpy as np
 import csv
 
+from edgar.scoring.utils import eval_fingerprint as default_eval_fingerprint
+
 DT = 0.1
 DEFAULT_DATA_PATH = "/home/rajah/projects/synaptic_transmission/dataset/data.npz"
 DEFAULT_DISCOVERY_EQUILIBRATION_MS = 30_000.0
@@ -194,6 +196,34 @@ def apply_model(model_fn, data, params):
         return jax.vmap(per_protocol)(stim_s)
 
     return jax.vmap(per_sample, in_axes=(0, 0))(stim, params)
+
+
+def eval_fingerprint(model_fn, params, X_eval, apply_model_fn):
+    """Build a fingerprint from release predictions at one protocol's observations.
+
+    Only the first protocol in ``X_eval`` is rolled out. The returned fingerprint
+    contains release predictions at its observed event times; padded or missing
+    observations are zeroed. Parameter/sample selection follows EDGAR's default
+    fingerprint helper.
+    """
+    # Keep the sample dimension and _sample_indices, but avoid rolling out the
+    # remaining protocols. All other project data fields have protocol axis 1.
+    protocol_data = {
+        key: value[:, :1] if key != "_sample_indices" else value
+        for key, value in X_eval.items()
+    }
+    model_output = default_eval_fingerprint(
+        model_fn, params, protocol_data, apply_model_fn
+    )
+
+    observation_index = protocol_data["_observation_index"]
+    safe_index = jnp.maximum(observation_index, 0)
+    release = jnp.take_along_axis(
+        model_output["release"], safe_index, axis=-1
+    )
+    valid = (observation_index >= 0) & jnp.isfinite(protocol_data["release"])
+    return jnp.where(valid, release, 0.0)
+
 
 def loss_fn(model_output, data):
     """Calculate per-sample RMSE over all non-padded observations."""
