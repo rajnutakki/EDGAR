@@ -24,9 +24,7 @@ class ModelSchema(BaseModel):
         )
     )
     descriptive_name: str = Field(
-        description=(
-            "A concise, descriptive name for the model (e.g., 'Double Gaussian Model')."
-        )
+        description=("A concise, descriptive name for the model.")
     )
     code: str = Field(
         description=(
@@ -38,7 +36,6 @@ class ModelSchema(BaseModel):
         description=(
             "A dict of sensible numeric initial values for every free parameter used by the model."
             "Keys must exactly match those used in `params` inside the model function. "
-            "Values must be numeric scalars, plain lists or numpy arrays."
             "Example: {'amplitude': 1.0, 'decay_rate': 0.1}"
         )
     )

@@ -1,72 +1,126 @@
 model:
-  base: 'You are an AI scientist learning a state-space model of synaptic vesicle
-    release. Each sample contains several stimulation protocols that share one
-    parameter set. The framework equilibrates the model without stimulation,
-    resets each protocol to that equilibrated state, performs a dense 0.1 ms
-    rollout, and compares release only at experimental event times.
+  base: 'You are an AI scientist. Your task is to come up with a new, parameter-efficient, 
+    state-space model which has lower score than previous models. The score is computed as the 
+    root mean squared error between the model''s predicted release (after optimizing free parameters) 
+    and the experimentally measured release data, 
+    plus a complexity penalty for the number of free parameters in the model. 
 
-    Below are {num_parents} models, sorted from worst to best. Analyze their
-    progression and create a mechanistically plausible model that improves on
-    all of them.
+    Model details:
+    * The model implements an Euler integration step of `DT = 0.1` ms.
+    * The state variables are initialized to specified values, the model is then rolled out
+    for a long period of time, allowing the state variables to reach a steady state.
+    * A stimulus protocol is then applied, during which the model''s predicted release is
+    compared to the experimentally measured release.
+
+    Below are {num_parents} models, sorted from worst to best. Analyze the strengths and weaknesses
+    of the models, and use this information to create a new model that improves on all of them, while
+    reducing the number of free parameters.
     '
+  
+  explore: 'Use the models below as inspiration, but be *creative* and *invent* new, plausible mechanisms
+   to describe the data.
+    '
+  exploit: 'Use the models below as a *template* to create a new model. 
+    Which features result in a reduced error, and which do not?
+    Combine the strengths of the existing models while removing weaknesses and redundancies.
+    '
+
   code_guidelines: '**Code Generation Guidelines:**
 
-    * Import numpy as np and define `DT = 0.1`.
-
-    * Define `def initial_state(params):` returning a dict of scalar initial
-    reservoir values. These values must be fixed constants or derived from
-    structural parameters such as a total pool size. They must not be separate
-    learnable initial-state parameters.
-
-    * Model signature must be `def model(hidden_state, y_prev, params):` for one
-    Euler step. `y_prev` is a dict containing `stim_prev` and `release_prev`.
-    Return `(new_hidden_state, release)`, where the state dict has exactly the
-    same keys as `initial_state(params)`.
-
+    The code you provide *MUST* contain:
+    * All necessary imports.
+    * Setting `DT = 0.1`.
+    * A `def initial_state(params) -> dict[str, float]:` function which returns 
+    a dictionary of initial state-variable values.
+    * A `def model(hidden_state: dict[str, float], y_prev: dict[str, float], params: dict[str, float]) -> tuple[dict[str, float], float]:`
+    function which implements one Euler step of the model. 
+    The function *MUST* return the tuple `(new_hidden_state, release)`.
     * After defining the model, set `model.INITIAL_STATE = initial_state`.
 
-    * Do not use any `s0_*` parameters. The framework rejects models without a
-    callable `model.INITIAL_STATE` and performs equilibration before stimulation.
+    The dictionary returned by `initial_state` *MUST* have exactly the same keys as the `hidden_state` dictionary, consumed and returned by `model`.
+    The `params` dictionary *MUST* contain all free parameters of the model, and *MUST NOT* contain any initial-state values.
+    Use reasonable values for the initial state variables, based on the scale of state variables in previous models.
 
-    * Provide `model.DEFAULT_PARAMS`, with one float for every learnable dynamics
-    or structural parameter and no initial-state entries. Its keys must exactly
-    match the keys read from `params` by both `model` and `initial_state`.
+    The code *MUST* be JAX-compatible, both `model` and `initial_state` will be called under `jax.jit`.
+    '
+  
+  docstring_guidelines: '**Docstring Guidelines:**
+    * Use a descriptive name for the model, not a version number.
+    * Briefly describe what the model computes.
+    * Specify the state variables and parameters of the model.
+    '
+  
+  image_analysis_instructions: 'Analyze the plots below to identify strengths and weaknesses of the models.
+    The top two rows show the equilibration of the model''s state variables, before different stimulus protocols, with different parameters fitted in each case.
+    The first row for the worst-performing model, the second row for best-performing model.
+    This shows how the state variables equilibrate towards steady-state values. Do these steady-state values provide good initial conditions for the corresponding stimulus protocols (bottom row)?
+    If not, how can the initialization and evolution of the state variables be improved?
 
-    * Use scalar arithmetic only inside `model` and `initial_state`; both are
-    called under jax.jit, jax.grad, jax.vmap, and jax.lax.scan after translation.
+    The bottom row shows the release predicted by the model (worst-performing blue, best-performing orange), compared to the experimentally measured release (black). Each dataset has a different stimulus protocol, and separate optimized parameters.
+    The bottom panels of the plots show the absolute value of the residuals (|predicted - measured|) for both models.
+    How well does the model capture the dynamics of the release? Are there any systematic deviations between the model and the data? If so, how can the model be improved to better capture these dynamics?
+    Every data point corresponds to a stimulus event, does the release correctly decay during periods of repeated stimulation and recover during periods of no stimulation? If not, how can the model be improved to better capture these dynamics?
+    Are there more parameter-efficient ways to capture the observed dynamics?
+    '
+
+  parent_program_template: 'Model: {name}
+
+    Score: {program_losses.discover.final}
+    Number of free parameters : {n_params}
+
+    ```python
+    {code.model}
+    ```
+
+    ----------------------------
+
     '
 
 parameter_estimator:
+  base: 'You are an AI scientist. 
+    Your task is to create a simple parameter estimator function to estimate the free parameters of 
+    the latest model (shown last below). Also included are previous parent models, their parameter 
+    estimators, initial parameter estimates from these parameter estimators
+    and the parameter values after further optimization on training datasets.
+    
+    Use the initial and optimized parameter values as guidance for parameter scales.
+    You may use the `data["release"]` and `data["time"]` arrays to compute statistics to obtain parameter estimates.
+    '
   code_guidelines: '**Code Generation Guidelines:**
 
-    * Import numpy as np.
+    * Include all necessary imports.
 
-    * Define `def parameter_estimator(data):`. The unbatched data contains
-    `release` and `time` arrays shaped `(n_protocols, n_observations)`, padded
-    with NaNs, plus dense stimulus and internal alignment arrays.
-
-    * Return plain Python floats whose keys exactly match `model.DEFAULT_PARAMS`.
-
-    * Do not return `s0_*` or any other initial-state values. Initial state is
-    fixed or derived by the model''s `initial_state(params)` function.
-
-    * Your response must be less than {max_lines} lines, and must not call the
-    model or use fitting functions such as {swear_words}.
+    * Implement the parameter estimation by defining `def parameter_estimator(data) -> dict[str, float]:`, 
+    returning a dictionary whose keys exactly match the `params` dictionary used by the model and whose values match the expected types of the parameters.
     '
 
-jax_translator_model:
-  code_guidelines: 'CRITICAL JAX compatibility requirements:
+  docstring_guidelines: '**Docstring Guidelines:**
+    * Briefly describe the estimation method.`
+    '
 
-    * Preserve `DT`, `initial_state(params)`, `model(hidden_state, y_prev, params)`,
-    `model.DEFAULT_PARAMS`, and `model.INITIAL_STATE = initial_state`.
+  parent_program_template: 'Parent model: {name}
 
-    * Replace numpy with jax.numpy as jnp. Both functions must remain compatible
-    with jax.jit, jax.grad, jax.vmap, and jax.lax.scan.
+    Score: {program_losses.discover.final}
 
-    * Keep the hidden-state dictionary structure invariant. Avoid Python control
-    flow depending on traced values, dynamic shapes, and conversion of JAX values
-    with Python int or float.
+    Model:
+    ```python
+    {code.model}
+    ```
+    Parameter estimator:
+    ```python
+    {code.best_param_est}
+    ```
 
-    * Do not introduce `s0_*` parameters or turn initial-state values into
-    learnable parameters.
+    Initial parameter estimates:
+    ```python
+    {params_init}
+    ```
+    Optimized parameter values:
+    ```python
+    {params}
+    ```
+    ---
+    '
+  current_program_template: 'New model: {name}
+    {code.model}
     '

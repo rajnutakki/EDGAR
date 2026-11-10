@@ -1,10 +1,8 @@
-import numpy as np
+import jax.numpy as jnp
 
 DT = 0.1  # integration step, ms (matches the data-generating grid)
 
-
 def initial_state(params):
-    """Return the fixed Berkeley Madonna initialization for the RP model."""
     TS = 2.0
     LTS = 0.0
     return {
@@ -83,11 +81,11 @@ def model(hidden_state, y_prev, params):
     J7 = P * deltaca / DT
 
     # Euler update
-    LS = np.maximum(LS_prev + DT * (-J2 + J3 + J1 - J4 + J8), 0.0)
-    TS = np.maximum(TS_prev + DT * (+J2 - J5 - J3 + J10), 0.0)
+    LS = jnp.maximum(LS_prev + DT * (-J2 + J3 + J1 - J4 + J8), 0.0)
+    TS = jnp.maximum(TS_prev + DT * (+J2 - J5 - J3 + J10), 0.0)
     LTS = LTS_prev + DT * (+J4 - J8 - J9)
     RP = RP_prev + DT * (-J10 + J11)
-    Ca = np.maximum(Ca_prev + DT * (-J6 + J7), 0.0)
+    Ca = jnp.maximum(Ca_prev + DT * (-J6 + J7), 0.0)
 
     new_hidden_state = {
         "LS": LS,

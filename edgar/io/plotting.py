@@ -46,7 +46,11 @@ def _feedback_image_worker(
         diag = getattr(spec, "diagnostics", None)
         if diag is not None:
             diag.generate_feedback_image(
-                data, parents, rng=spec.rng, save_path=img_path
+                data,
+                parents,
+                rng=spec.rng,
+                save_path=img_path,
+                apply_model_fn=getattr(spec, "apply_model_fn", None),
             )
 
         if os.path.exists(img_path):
@@ -103,6 +107,7 @@ def _program_fits_worker(
                     program_names=[f"{p.name} (Init)", f"{p.name} (Final)"],
                     params=[params_init, params],
                     rng=spec.rng,
+                    apply_model_fn=getattr(spec, "apply_model_fn", None),
                 )
                 results.append((p.idx, str(save_path)))
             except Exception as e:
