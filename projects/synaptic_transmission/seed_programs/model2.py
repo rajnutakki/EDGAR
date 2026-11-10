@@ -2,6 +2,7 @@ import jax.numpy as jnp
 
 DT = 0.1  # integration step, ms (matches the data-generating grid)
 
+
 def initial_state(params):
     TS = 2.0
     LTS = 0.0
@@ -15,21 +16,25 @@ def initial_state(params):
 
 
 def model(hidden_state, y_prev, params):
-    """Replacement Pool (RP) model of synaptic transmission.
+    """Coupled-state response model with an auxiliary replenishment state.
 
-    Reservoirs:
-        - LS: synaptic vesicles in loosely docked state
-        - TS: synaptic vesicles in tightly docked state
-        - LTS: synaptic vesicles in labile tightly docked state
-        - RP: synaptic vesicles in replacement pool
-        - Ca: AP-induced effective [Ca2+] transient above basal rest (uM)
+    State variables:
+        LS: intermediate state that supplies TS and LTS.
+        TS: response-generating state depleted by stimulus events.
+        LTS: additional response-generating state populated by stimulus events.
+        RP: auxiliary state that supplies TS and relaxes toward a target level.
+        Ca: stimulus-driven modulation signal with exponential decay.
 
     Inputs:
-        hidden_state: dict with keys {"LS", "TS", "LTS", "RP", "Ca"}
-        y_prev: dict with keys:
-            - "stim_prev" (or "P_prev"): action potential stimulus at t-1 (1 if pulse present, 0 otherwise)
-            - "release_prev": previous observed release (optional)
-        params: dict of learnable model parameters
+        hidden_state: dict with keys {"LS", "TS", "LTS", "RP", "Ca"}.
+        y_prev: dict containing:
+            stim_prev: binary stimulus indicator for the current step;
+                P_prev is accepted as an alternative key.
+            release_prev: previous model-predicted response (unused here).
+        params: dict of free model parameters.
+
+    Returns:
+        Updated hidden state and the response amplitude for the current step.
     """
     LS_prev = hidden_state["LS"]
     TS_prev = hidden_state["TS"]
@@ -61,7 +66,7 @@ def model(hidden_state, y_prev, params):
     k2 = k2rest + sigma2 * Ca_prev
     k1 = (k1rest + (sigma1 * Ca_prev)) * ((N - SumLS_TS_LTS) / N)
 
-    # Evoked release and transition by stimulus
+    # Event response and stimulus-driven state transfer
     release1 = Pf * TS_prev * P
     release2 = Pf * LTS_prev * P
     release = release1 + release2
@@ -108,7 +113,6 @@ model.DEFAULT_PARAMS = {
     "k5": 0.005,
     "deltaca": 0.1,
     "cadecay": 0.01,
-    "Crest": 0.05,
     "k2rest": 0.001,
     "k1rest": 0.008,
     "s1": 0.2,

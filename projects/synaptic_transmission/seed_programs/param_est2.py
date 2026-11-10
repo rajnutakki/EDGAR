@@ -1,6 +1,5 @@
-
 def parameter_estimator(data):
-    """RP model parameter estimator based on previous optimizations, in future use statistical methods to estimate from data"""
+    """Parameter estimator based on previous optimizations, in future use statistical methods to estimate from data"""
     return {
         "N": 10.0,
         "Pf": 0.69507,
@@ -11,7 +10,6 @@ def parameter_estimator(data):
         "k5": 0.0055,
         "deltaca": 0.11,
         "cadecay": 0.01226,
-        "Crest": 0.05,
         "k2rest": 0.0001,
         "k1rest": 0.00795,
         "s1": 0.20331,

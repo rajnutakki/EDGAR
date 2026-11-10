@@ -1,102 +1,57 @@
 model:
-  base: 'You are an AI scientist. Your task is to come up with a new, parameter-efficient, 
-    state-space model which has lower score than previous models. The score is computed as the 
-    root mean squared error between the model''s predicted release (after optimizing free parameters) 
-    and the experimentally measured release data, 
-    plus a complexity penalty for the number of free parameters in the model. 
+  base: 'You are an AI scientist. Create a parameter-efficient state-space model that minimizes the held-out score of the parent models.
 
-    Model details:
-    * The model implements an Euler integration step of `DT = 0.1` ms.
-    * The state variables are initialized to specified values, the model is then rolled out
-    for a long period of time, allowing the state variables to reach a steady state.
-    * A stimulus protocol is then applied, during which the model''s predicted release is
-    compared to the experimentally measured release.
+    **Evaluation contract:**
+    * Each sample is one experiment containing multiple stimulus protocols. For every fold, model parameters are fitted jointly to all but one protocol, then evaluated on the held-out protocol without refitting. The error averages held-out fold RMSEs.
+    * One parameter set is shared across all training protocols within a fold. Protocols are reset independently to `initial_state(params)`.
+    * The reported score is held-out RMSE plus a complexity penalty of 0.01 per scalar free parameter. Do not include unused parameters.
+    * Release is the predicted response amplitude at a stimulus event, expressed on the same scale as the measured release data. The input is a binary stimulus indicator on a dense 0.1 ms grid; `model` is called at every step, including silent intervals. `y_prev["stim_prev"]` is the stimulus for the current integration step. `y_prev["release_prev"]` is the previous model-predicted release, not an experimental observation. Return release for the current step, which should be zero without a stimulus.
+    * Only predictions at observed stimulus events contribute to the loss.
+    * Unstimulated equilibration lasts 30,000 ms. These durations do not guarantee steady state.
 
-    Below are {num_parents} models, sorted from worst to best. Analyze the strengths and weaknesses
-    of the models, and use this information to create a new model that improves on all of them, while
-    reducing the number of free parameters.
-    '
-  
-  explore: 'Use the models below as inspiration, but be *creative* and *invent* new, plausible mechanisms
-   to describe the data.
-    '
-  exploit: 'Use the models below as a *template* to create a new model. 
-    Which features result in a reduced error, and which do not?
-    Combine the strengths of the existing models while removing weaknesses and redundancies.
-    '
+    Below are {num_parents} parent models sorted from worst to best. Analyze their strengths and weaknesses and use the evidence to propose a new model that improves held-out performance while reducing unnecessary complexity.'
+
+  explore: 'Use the models as inspiration, but be creative: invent plausible mechanisms that explain the data.'
+  exploit: 'Use the models as templates. Identify which features improve held-out predictions, combine their strengths, and remove weaknesses and redundant parameters.'
 
   code_guidelines: '**Code Generation Guidelines:**
 
-    The code you provide *MUST* contain:
-    * All necessary imports.
-    * Setting `DT = 0.1`.
-    * A `def initial_state(params) -> dict[str, float]:` function which returns 
-    a dictionary of initial state-variable values.
-    * A `def model(hidden_state: dict[str, float], y_prev: dict[str, float], params: dict[str, float]) -> tuple[dict[str, float], float]:`
-    function which implements one Euler step of the model. 
-    The function *MUST* return the tuple `(new_hidden_state, release)`.
-    * After defining the model, set `model.INITIAL_STATE = initial_state`.
+    Return code containing all necessary imports, `DT = 0.1`, `initial_state(params)`, and `model(hidden_state, y_prev, params)`. The model must implement one explicit Euler step and return `(new_hidden_state, release)`. After defining the model, set `model.INITIAL_STATE = initial_state` and `model.DEFAULT_PARAMS` to sensible scalar numeric defaults for every free parameter.
 
-    The dictionary returned by `initial_state` *MUST* have exactly the same keys as the `hidden_state` dictionary, consumed and returned by `model`.
-    The `params` dictionary *MUST* contain all free parameters of the model, and *MUST NOT* contain any initial-state values.
-    Use reasonable values for the initial state variables, based on the scale of state variables in previous models.
+    Generated model source is executed directly with JAX. Use `jax.numpy` (`jnp`) for operations on traced values. Avoid Python control flow dependent on traced values, and Python `int()` or `float()` conversions of traced values. Preserve hidden-state keys, shapes, and dtypes across steps. Both `model` and `initial_state` must be compatible with `jax.jit` and `jax.vmap`.
 
-    The code *MUST* be JAX-compatible, both `model` and `initial_state` will be called under `jax.jit`.
-    '
-  
-  docstring_guidelines: '**Docstring Guidelines:**
-    * Use a descriptive name for the model, not a version number.
-    * Briefly describe what the model computes.
-    * Specify the state variables and parameters of the model.
-    '
-  
-  image_analysis_instructions: 'Analyze the plots below to identify strengths and weaknesses of the models.
-    The top two rows show the equilibration of the model''s state variables, before different stimulus protocols, with different parameters fitted in each case.
-    The first row for the worst-performing model, the second row for best-performing model.
-    This shows how the state variables equilibrate towards steady-state values. Do these steady-state values provide good initial conditions for the corresponding stimulus protocols (bottom row)?
-    If not, how can the initialization and evolution of the state variables be improved?
+    The initial-state dictionary must have exactly the same keys as the hidden-state dictionary consumed and returned by the model. The params dictionary must contain all free parameters and no initial-state values. Use reasonable initial state values based on the state scales in the parent models. Do not include unused parameters.'
 
-    The bottom row shows the release predicted by the model (worst-performing blue, best-performing orange), compared to the experimentally measured release (black). Each dataset has a different stimulus protocol, and separate optimized parameters.
-    The bottom panels of the plots show the absolute value of the residuals (|predicted - measured|) for both models.
-    How well does the model capture the dynamics of the release? Are there any systematic deviations between the model and the data? If so, how can the model be improved to better capture these dynamics?
-    Every data point corresponds to a stimulus event, does the release correctly decay during periods of repeated stimulation and recover during periods of no stimulation? If not, how can the model be improved to better capture these dynamics?
-    Are there more parameter-efficient ways to capture the observed dynamics?
-    '
+  docstring_guidelines: '**Docstring Guidelines:** use a descriptive model name, briefly describe the computation, and specify the state variables and parameters.'
+
+  image_analysis_instructions: 'If a feedback plot is provided, analyze it. The first two rows show the parent models’ state equilibration, one held-out fold per column; the first row is the worst parent and the second the best. These are fixed-duration 30,000 ms traces and may not reach steady state. How will the state variable values at the end of equilibration affect the first event in stimulus protocol? How could the initialization and evolution of state variables be improved to better match the protocol?
+
+    The release row (one above the bottom) shows event-wise predictions for the held-out protocol (worst parent blue, best parent orange) against measurements (black). Each parent’s parameters for that fold were fitted jointly to the other protocols; the held-out protocol was not used for fitting. The bottom row shows absolute event-wise residuals. Lines joining event predictions are visual guides only, not continuous predictions during silent intervals.
+
+    Look for systematic differences, depression during repeated stimulation, and recovery as hidden states evolve during silent intervals (assess recovery from the first event after a gap). Suggest parameter-efficient ways to improve the observed dynamics. If no plot is attached, rely on the model code and evaluation contract instead.'
 
   parent_program_template: 'Model: {name}
 
     Score: {program_losses.discover.final}
-    Number of free parameters : {n_params}
+    Number of free parameters: {n_params}
 
     ```python
     {code.model}
     ```
-
-    ----------------------------
-
-    '
+    ----------------------------'
 
 parameter_estimator:
-  base: 'You are an AI scientist. 
-    Your task is to create a simple parameter estimator function to estimate the free parameters of 
-    the latest model (shown last below). Also included are previous parent models, their parameter 
-    estimators, initial parameter estimates from these parameter estimators
-    and the parameter values after further optimization on training datasets.
-    
-    Use the initial and optimized parameter values as guidance for parameter scales.
-    You may use the `data["release"]` and `data["time"]` arrays to compute statistics to obtain parameter estimates.
-    '
+  base: 'You are an AI scientist. Create a simple, fast parameter estimator for the latest model (shown last). Previous parent models, their estimators, initial estimates, and optimized parameter values are provided as guidance for parameter scales.
+
+    The estimator is called once per training sample (one fold) and returns one scalar parameter dictionary shared by all protocols in that sample. It receives an unbatched NumPy data dictionary. `data["release"]` and `data["time"]` have shape `(n_protocols, max_observations)`: axis 0 indexes protocols and axis 1 indexes observation events. Shorter protocols are padded with NaN; exclude padded entries using `numpy.isfinite` masks before calculating statistics. `time` is in milliseconds from each protocol’s first event; `release` contains the measured response amplitudes in the original dataset units.
+
+    `data["stim"]` has shape `(n_protocols, n_dense_steps)` and contains binary stimulus indicators on the 0.1 ms grid. `data["_observation_index"]` has shape `(n_protocols, max_observations)` and maps observations to dense-grid indices; `-1` marks padding. Parameters are shared across protocols in a sample. Use the observed release, event times, and stimulus information as useful. Do not perform nested optimization or call the model. Return finite scalar numeric values for every model parameter.'
+
   code_guidelines: '**Code Generation Guidelines:**
 
-    * Include all necessary imports.
+    Include necessary imports and define `def parameter_estimator(data) -> dict[str, float]:`. Return keys exactly matching the model free parameters and finite scalar numeric values. The estimator runs on NumPy data and need not be JAX-compatible. Return code only.'
 
-    * Implement the parameter estimation by defining `def parameter_estimator(data) -> dict[str, float]:`, 
-    returning a dictionary whose keys exactly match the `params` dictionary used by the model and whose values match the expected types of the parameters.
-    '
-
-  docstring_guidelines: '**Docstring Guidelines:**
-    * Briefly describe the estimation method.`
-    '
+  docstring_guidelines: '**Docstring Guidelines:** briefly describe the estimation method.'
 
   parent_program_template: 'Parent model: {name}
 
@@ -110,7 +65,6 @@ parameter_estimator:
     ```python
     {code.best_param_est}
     ```
-
     Initial parameter estimates:
     ```python
     {params_init}
@@ -119,8 +73,6 @@ parameter_estimator:
     ```python
     {params}
     ```
-    ---
-    '
+    ---'
   current_program_template: 'New model: {name}
-    {code.model}
-    '
+    {code.model}'

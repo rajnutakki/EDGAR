@@ -1,5 +1,5 @@
 def parameter_estimator(data):
-    """Neher model parameter estimator based on previous optimizations, in future use statistical methods to estimate from data"""
+    """Parameter estimator based on previous optimizations, in future use statistical methods to estimate from data"""
     return {
         "b1": 0.00015,
         "b2": 0.00019,
@@ -9,7 +9,6 @@ def parameter_estimator(data):
         "k_1": 0.18600,
         "deltaca": 0.11,
         "cadecay": 0.0003262,
-        "Crest": 0.00858,
         "k2rest": 0.000148,
         "k1rest": 0.000148,
         "s1": 0.21322,
