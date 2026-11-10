@@ -1,10 +1,8 @@
-import numpy as np
+import jax.numpy as jnp
 
 DT = 0.1  # integration step, ms (matches the data-generating grid)
 
-
-def initial_state(params):
-    """Return the fixed Berkeley Madonna initialization for the Neher model."""
+def initial_state(params) -> dict:
     return {
         "ES": params["Ntotal"],
         "LS": 0.0,
@@ -77,10 +75,10 @@ def model(hidden_state, y_prev, params):
     J10 = release2 / DT
 
     # Euler integration
-    ES = np.maximum(ES_prev + DT * (-J1 + J4 + J5 + J10), 0.0)
-    LS = np.maximum(LS_prev + DT * (+J1 - J2 + J3 - J4 - J8 + J9), 0.0)
-    TS = np.maximum(TS_prev + DT * (+J2 - J3 - J5), 0.0)
-    Ca = np.maximum(Ca_prev + DT * (-J6 + J7), 0.0)
+    ES = jnp.maximum(ES_prev + DT * (-J1 + J4 + J5 + J10), 0.0)
+    LS = jnp.maximum(LS_prev + DT * (+J1 - J2 + J3 - J4 - J8 + J9), 0.0)
+    TS = jnp.maximum(TS_prev + DT * (+J2 - J3 - J5), 0.0)
+    Ca = jnp.maximum(Ca_prev + DT * (-J6 + J7), 0.0)
     LTS = LTS_prev + DT * (+J8 - J9 - J10)
 
     new_hidden_state = {

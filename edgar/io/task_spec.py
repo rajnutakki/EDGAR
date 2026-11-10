@@ -155,6 +155,8 @@ def _load_diagnostics(project_dir: Path) -> BaseDiagnostics | None:
 
             class _LegacyDiagnostics(BaseDiagnostics):
                 def plot_model_fits(self, *args, **kwargs):
+                    # The legacy plotting API predates custom rollout hooks.
+                    kwargs.pop("apply_model_fn", None)
                     return plot_fn(*args, **kwargs)
 
             return _LegacyDiagnostics()
