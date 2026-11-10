@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import warnings
-from typing import Any, TYPE_CHECKING, Callable
+from dataclasses import dataclass
+from typing import Any, TYPE_CHECKING, Callable, Awaitable
 import numpy as np
 
 from pydantic_ai.models import Model
@@ -31,7 +32,103 @@ from ..llm.code_loading import load_function_from_source
 from ..io.plotting import generate_feedback_image
 
 if TYPE_CHECKING:
-    from ..io.task_spec import TaskSpec
+    from ..io.task_spec import TaskSpec, LLMs
+
+
+@dataclass(frozen=True)
+class GenerationStage:
+    """A named, configured generation operation for one run generation.
+
+    The operation accepts its live population and discovery data at
+    execution time; configuration specific to the stage is bound by the builder.
+    """
+
+    name: str
+    execute: Callable[..., Awaitable[None]]
+
+
+def _build_model_stage(spec, llms, mode, config, retry_config):
+    """Bind model-generation settings, leaving population and data for execution."""
+
+    async def execute(population: Population, *, data: dict) -> None:
+        await generate_models(
+            population,
+            spec.prompt_schemas.model,
+            llms.model,
+            mode,
+            config=config,
+            spec=spec,
+            data=data,
+            output_schema=spec.response_schemas.model,
+        )
+
+    return execute
+
+
+def _build_param_est_stage(spec, llms, mode, config, retry_config):
+    """Bind parameter-estimator settings using the common stage interface."""
+
+    async def execute(population: Population, *, data: dict) -> None:
+        await generate_param_ests(
+            population,
+            spec.prompt_schemas.param_est,
+            llms.param_est,
+            config,
+            output_schema=spec.response_schemas.param_est,
+        )
+
+    return execute
+
+
+def _build_translation_stage(spec, llms, mode, config, retry_config):
+    """Bind translation settings using the common stage interface."""
+
+    async def execute(population: Population, *, data: dict) -> None:
+        await translate_programs(
+            population,
+            spec.prompt_schemas.jax_model,
+            llms.model_jax,
+            retry_config=retry_config,
+            max_tokens=config.get("max_tokens"),
+            output_schema=spec.response_schemas.jax_model,
+        )
+
+    return execute
+
+
+_STAGE_BUILDERS = {
+    "generate_models": _build_model_stage,
+    "generate_param_ests": _build_param_est_stage,
+    "translate_programs": _build_translation_stage,
+}
+
+
+def build_generation_stages(
+    stages: list[str],
+    spec: TaskSpec,
+    llms: LLMs,
+    mode: str,
+    config: dict[str, Any],
+    retry_config: RetryConfig,
+) -> list[GenerationStage]:
+    """Build configured stage callables for a generation.
+
+    Resolve configured names through the stage-builder registry, preserving their
+    order. Builders bind prompts, models, schemas and options; the runner supplies
+    the live population/data and owns timing and progress item counts.
+
+    Raises:
+        ValueError: If a configured stage name is not registered.
+    """
+    selected = []
+    for name in stages:
+        try:
+            builder = _STAGE_BUILDERS[name]
+        except KeyError:
+            raise ValueError(f"Unknown generation stage: {name}") from None
+        execute = builder(spec, llms, mode, config, retry_config)
+        selected.append(GenerationStage(name=name, execute=execute))
+    return selected
 
 
 # ---------------------------------------------------------------------------

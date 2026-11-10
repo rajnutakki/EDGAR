@@ -501,7 +501,7 @@ class Config(BaseModel):
             such as parent selection, retry policies, and model choices.
         scoring: Configuration for evaluating model performance, including
             loss penalties, timeouts, and gradient descent settings.
-        run: General run-specific configuration, including the generation stages.
+        run: General run-specific configuration, including the model generation stages.
         project_params: A flexible dictionary for arbitrary, user-defined
             project-specific parameters that do not fit into the structured
             configuration sections.

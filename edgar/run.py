@@ -16,7 +16,7 @@ import os
 from .io.task_spec import TaskSpec
 from .io.logging import open_log, log_generation, close_log, print_and_log, gen_banner
 from .io.status import write_status, read_status
-from .io.metrics import RunMetrics, timed, read_metrics
+from .io.metrics import RunMetrics, timed, read_metrics, stage_timer
 from .evolution.population import Population
 from .evolution.island import (
     seed,
@@ -28,13 +28,12 @@ from .evolution.island import (
     load_island_census,
 )
 from .llm.generate import (
-    generate_models,
-    generate_param_ests,
     finalize_model_code,
     mark_failed_generations,
+    build_generation_stages,
     translate_programs,
 )
-from .io.config import RetryConfig, RunConfig, GenerationStage
+from .io.config import RetryConfig, RunConfig
 from .scoring.scoring import rank, score
 from .jax.utils import _to_numpy
 from .io.plotting import generate_program_images
@@ -49,9 +48,6 @@ t_fits_seeds = timed("generate_program_images_seeds", quiet=True)(
 )
 
 t_spawn = timed("spawn", quiet=True)(spawn)
-t_generate_models = timed("generate_models")(generate_models)
-t_generate_param_ests = timed("generate_param_ests")(generate_param_ests)
-t_translate_programs = timed("translate_programs")(translate_programs)
 t_mark_failed_generations = timed("mark_failed_generations", quiet=True)(
     mark_failed_generations
 )
@@ -62,56 +58,6 @@ t_prune = timed("prune", quiet=True)(prune)
 t_migrate = timed("migrate", quiet=True)(migrate)
 
 t_score_validate = timed("score_validate")(score)
-
-
-async def _execute_generation_stage(
-    stage: GenerationStage,
-    population: Population,
-    spec: TaskSpec,
-    llms: object,
-    gen: int,
-    mode: str,
-    config: dict,
-    retry_config: RetryConfig,
-    data: dict,
-    n_spawn: int,
-) -> None:
-    """Dispatch one configured LLM stage through its existing timed alias."""
-    if stage == "generate_models":
-        await t_generate_models(
-            population,
-            spec.prompt_schemas.model,
-            llms.model[gen % len(llms.model)]
-            if isinstance(llms.model, list)
-            else llms.model,
-            mode,
-            config=config,
-            spec=spec,
-            data=data,
-            output_schema=spec.response_schemas.model,
-            n_items=n_spawn,
-        )
-    elif stage == "generate_param_ests":
-        await t_generate_param_ests(
-            population,
-            spec.prompt_schemas.param_est,
-            llms.param_est,
-            config,
-            output_schema=spec.response_schemas.param_est,
-            n_items=n_spawn,
-        )
-    elif stage == "translate_programs":
-        await t_translate_programs(
-            population,
-            spec.prompt_schemas.jax_model,
-            llms.model_jax,
-            retry_config=retry_config,
-            max_tokens=config.get("max_tokens"),
-            output_schema=spec.response_schemas.jax_model,
-            n_items=n_spawn,
-        )
-    else:
-        raise ValueError(f"Unknown generation stage: {stage}")
 
 
 async def run(
@@ -266,6 +212,9 @@ async def run(
             for gen in range(start_gen, n_gens):
                 metrics.start_generation(gen)
                 mode, migration_temperature, llms = spec.schedule(gen)
+                generation_stages = build_generation_stages(
+                    stages, spec, llms, mode, config, retry_config
+                )
                 n_spawn = n_islands * batch_size
                 gen_banner(
                     log, gen, n_gens, mode, migration_temperature, llms, n_spawn=n_spawn
@@ -281,19 +230,9 @@ async def run(
                     rng=spec.rng,
                 )
 
-                for stage in stages:
-                    await _execute_generation_stage(
-                        stage,
-                        population,
-                        spec,
-                        llms,
-                        gen,
-                        mode,
-                        config,
-                        retry_config,
-                        X_discover[1],
-                        n_spawn,
-                    )
+                for generation_stage in generation_stages:
+                    with stage_timer(metrics, generation_stage.name, n_items=n_spawn):
+                        await generation_stage.execute(population, data=X_discover[1])
                 finalize_model_code(
                     population, translation_required=translation_required
                 )

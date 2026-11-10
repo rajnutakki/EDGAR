@@ -53,8 +53,9 @@ def test_stage_order_seeds_scoring_and_persistence(tmp_path, stages):
                 )
 
     async def translate(population, *args, **kwargs):
+        is_seed_translation = all(p.birth.generation == -1 for p in population)
         events.append(
-            "translate_seeds" if kwargs.get("n_items") == 2 else "translate_programs"
+            "translate_seeds" if is_seed_translation else "translate_programs"
         )
         for p in population:
             if p.code.model is not None and p.code.model_jax is None:
@@ -85,10 +86,10 @@ def test_stage_order_seeds_scoring_and_persistence(tmp_path, stages):
             p.program_losses.discover.final = 1.0
 
     with (
-        patch("edgar.run.t_generate_models", generate),
-        patch("edgar.run.t_generate_param_ests", estimators),
+        patch("edgar.llm.generate.generate_models", generate),
+        patch("edgar.llm.generate.generate_param_ests", estimators),
         patch("edgar.run.t_translate_seeds", translate),
-        patch("edgar.run.t_translate_programs", translate),
+        patch("edgar.llm.generate.translate_programs", translate),
         patch("edgar.run.t_score_seeds", score),
         patch("edgar.run.t_score", score),
         patch("edgar.run.t_score_validate"),
