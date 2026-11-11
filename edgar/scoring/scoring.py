@@ -55,6 +55,7 @@ def _get_params(param_est_fn, default_params, data_train):
     parameters for each sample in the training data. Estimator outputs must have
     the same keys and per-parameter shapes as `default_params`; otherwise it
     falls back to stacking the defaults for each sample.
+    This ensures default_params is the single source of truth for the expected parameter schema.
 
     Args:
         param_est_fn: The parameter estimator function (callable) from the program.
@@ -270,10 +271,7 @@ def _worker(
     try:
         penalty = config["param_penalty_weight"] * program.n_params
 
-        # DEFAULT_PARAMS define the parameter schema and must be usable by the
-        # model itself. Do not reject non-finite outputs: estimators may provide
-        # a better initialization. Force device execution here so runtime shape
-        # and indexing errors are caught before an estimator can mask them.
+        # 0.  Evaluate the model output with default parameters to ensure they are compatible with the model, they define the expected schema for the model.
         default_params_batched = _get_params(None, program.default_params, data_train)
         default_output = evaluate_model_output(
             model_fn, default_params_batched, data_train, apply_model_fn
