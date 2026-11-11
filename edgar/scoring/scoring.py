@@ -52,13 +52,14 @@ def _get_params(param_est_fn, default_params, data_train):
     """Estimates initial parameters for a model, falling back to defaults if the parameter estimator fails.
 
     This function attempts to use the provided `param_est_fn` to derive initial
-    parameters for each sample in the training data. If the `param_est_fn` is
-    not provided or fails during execution, it falls back to stacking the
-    `default_params` for each sample.
+    parameters for each sample in the training data. Estimator outputs must have
+    the same keys and per-parameter shapes as `default_params`; otherwise it
+    falls back to stacking the defaults for each sample.
 
     Args:
         param_est_fn: The parameter estimator function (callable) from the program.
-            Expected to take a single data sample (dict) and return a dict of parameters.
+            Expected to take a single data sample (dict) and return a dict with
+            the same keys and value shapes as `default_params`.
         default_params: A dictionary of default parameters for the model.
         data_train: A dictionary of training data, where keys are feature names
             and values are JAX arrays. Assumes the first dimension is the batch size.
@@ -75,6 +76,28 @@ def _get_params(param_est_fn, default_params, data_train):
         per_sample = [
             param_est_fn({k: v[i] for k, v in data_np.items()}) for i in range(n)
         ]
+        expected_keys = set(default_params)
+        for i, params in enumerate(per_sample):
+            if not isinstance(params, dict):
+                raise ValueError(
+                    f"estimator result for sample {i} is {type(params).__name__}, expected dict"
+                )
+            actual_keys = set(params)
+            if actual_keys != expected_keys:
+                missing = sorted(expected_keys - actual_keys)
+                extra = sorted(actual_keys - expected_keys)
+                raise ValueError(
+                    f"estimator keys differ from default_params for sample {i} "
+                    f"(missing: {missing}, extra: {extra})"
+                )
+            for key, default_value in default_params.items():
+                expected_shape = np.shape(default_value)
+                actual_shape = np.shape(params[key])
+                if actual_shape != expected_shape:
+                    raise ValueError(
+                        f"parameter {key!r} has shape {actual_shape} for sample {i}, "
+                        f"expected {expected_shape}"
+                    )
         return {
             k: jnp.stack([jnp.asarray(s[k]) for s in per_sample]) for k in per_sample[0]
         }
@@ -246,6 +269,18 @@ def _worker(
 
     try:
         penalty = config["param_penalty_weight"] * program.n_params
+
+        # DEFAULT_PARAMS define the parameter schema and must be usable by the
+        # model itself. Do not reject non-finite outputs: estimators may provide
+        # a better initialization. Force device execution here so runtime shape
+        # and indexing errors are caught before an estimator can mask them.
+        default_params_batched = _get_params(None, program.default_params, data_train)
+        default_output = evaluate_model_output(
+            model_fn, default_params_batched, data_train, apply_model_fn
+        )
+        for leaf in jax.tree_util.tree_leaves(default_output):
+            if hasattr(leaf, "block_until_ready"):
+                leaf.block_until_ready()
 
         # 1. Obtain initial parameters for each estimator
         params_inits = [
