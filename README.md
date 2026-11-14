@@ -1,6 +1,6 @@
 # EDGAR: Equation Discovery with Graphical AI Reasoning
 
-[![Tests](https://github.com/reillytilbury/EDGAR/actions/workflows/test.yml/badge.svg)](https://github.com/reillytilbury/EDGAR/actions/workflows/test.yml)
+[![Tests](https://github.com/rajnutakki/EDGAR/actions/workflows/test.yml/badge.svg)](https://github.com/rajnutakki/EDGAR/actions/workflows/test.yml)
 
 EDGAR is an evolutionary framework for discovering scientific equations using LLM-generated programs and parameter estimators.
 
@@ -24,7 +24,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 1. Install
 First clone the repository and checkout the `main` branch
 ```bash
-git clone https://github.com/reillytilbury/EDGAR.git
+git clone https://github.com/rajnutakki/EDGAR.git
 cd EDGAR
 git checkout main
 ``` 
@@ -84,21 +84,21 @@ bash scripts/check_api_keys.sh
 ### 3. Run an experiment
 
 ```bash
-edgar run projects/orientation_tuning/config.yaml
+uv run edgar run projects/orientation_tuning/config.yaml
 ```
 
 Control logging verbosity (default: `compact`):
 
 ```bash
-edgar run projects/orientation_tuning/config.yaml --log-level code
-edgar run projects/orientation_tuning/config.yaml --log-level prompts
+uv run edgar run projects/orientation_tuning/config.yaml --log-level code
+uv run edgar run projects/orientation_tuning/config.yaml --log-level prompts
 ```
 
 Override config values on the command line:
 
 ```bash
-edgar run projects/orientation_tuning/config.yaml --evolution.n_generations=5
-edgar run projects/orientation_tuning/config.yaml --llms.model_llm=gemini-2.5-pro
+uv run edgar run projects/orientation_tuning/config.yaml --evolution.n_generations=5
+uv run edgar run projects/orientation_tuning/config.yaml --llms.model_llm=gemini-2.5-pro
 ```
 
 ### Generation stages
@@ -125,27 +125,27 @@ Stages cannot be reordered, repeated, or extended. The setting is saved in
 Run a quick test with reduced settings (1 generation, 2 islands, batch size 2) to verify the pipeline is wired correctly
 
 ```bash
-edgar test projects/orientation_tuning/config.yaml
+uv run edgar test projects/orientation_tuning/config.yaml
 ```
 
 Reproduce a previous run from its saved `task_spec.yaml`:
 
 ```bash
-edgar run program_databases/my_task/2026-05-06/14-32-10/task_spec.yaml
+uv run edgar run program_databases/my_task/2026-05-06/14-32-10/task_spec.yaml
 ```
 
 To launch the dashboard to view in progress and finished experiments:
 ```bash
-edgar dashboard
+uv run edgar dashboard
 ```
 By default this allows access to data saved in `program_databases`. If the data you require is saved elsewhere, do
 ```bash
-edgar dashboard {data_directory}
+uv run edgar dashboard {data_directory}
 ```
 
 A failed run can be resumed, for example:
 ```bash
-edgar resume program_databases/my_task/yyyy-mm-dd/hh-mm-ss
+uv run edgar resume program_databases/my_task/yyyy-mm-dd/hh-mm-ss
 ```
 ---
 
@@ -154,7 +154,7 @@ edgar resume program_databases/my_task/yyyy-mm-dd/hh-mm-ss
 - edgar/ #the code used to perform an edgar run
 - projects/ #where the user should specify the configuration for their project
   # see "Setting up a new project"
-- edgar_experimental/ #experimental features (for inspecting output of edgar runs)
+- edgar_experimental/ #experimental analysis tools
 - scripts/ #some useful scripts for debugging your project configuration
 ```
 

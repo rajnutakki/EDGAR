@@ -1,3 +1,5 @@
+"""Helpers for applying models, computing losses, and preparing scoring data."""
+
 import math
 from typing import Any, Callable
 
@@ -9,6 +11,11 @@ import numpy as np
 
 
 def apply_model_plain(model_fn, data, params):
+    """Apply a model independently to each sample using ``jax.vmap``.
+
+    The leading axis of every data and parameter leaf is treated as the sample
+    axis. The model receives one sample and its parameters at a time.
+    """
     return jax.vmap(model_fn, in_axes=(0, 0))(data, params)
 
 
@@ -130,21 +137,20 @@ def evaluate_scalar_loss(
 
 
 def eval_fingerprint(model_fn, params, X_eval, apply_model_fn=apply_model_plain):
-    """Generates a low-dimensional "fingerprint" of model outputs for deduplication.
+    """Evaluate model outputs on the selected samples for deduplication.
 
-    This fingerprint is used to compare models and identify functionally
-    identical or very similar programs, even if their code differs. It applies
-    the model to a small, fixed subset of the evaluation data (`X_eval`).
+    ``X_eval["_sample_indices"]`` selects the corresponding rows from each
+    parameter leaf. The model is then applied to ``X_eval`` using
+    ``apply_model_fn``; the resulting outputs form the fingerprint.
 
     Args:
         model_fn: The JAX-compiled model function (callable).
         params: The model parameters (JAX pytree).
-        X_eval: A dictionary of evaluation data, containing a `_sample_indices`
-            key to select a subset of samples for fingerprinting.
-        apply_model_fn: A callable that applies the model function to the data and parameters.
+        X_eval: Evaluation-data dictionary containing ``_sample_indices``.
+        apply_model_fn: Callable that applies the model to batched data and parameters.
 
     Returns:
-        A JAX array representing the model's output fingerprint.
+        The JAX array of model outputs used as the program fingerprint.
     """
     sample_indices = X_eval["_sample_indices"]
     params_matched = jax.tree_util.tree_map(lambda p: p[sample_indices], params)
