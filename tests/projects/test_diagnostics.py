@@ -161,6 +161,12 @@ def test_generate_program_fits_skips_already_plotted(tmp_path):
     generate_program_fits(spec, {"x": np.array([1, 2])}, [p1, p2])
     assert p1.fit_image_path is not None
     assert p2.fit_image_path is not None
+    p1.params_validate = {"w": np.array([7.0])}
+    p1.params_init_validate = {"w": np.array([6.0])}
+    p1.program_losses.validate = LossStats(init=8.0, final=7.0)
+    generate_program_fits(spec, {"x": np.array([9, 10, 11])}, [p1], split="validate")
+    assert p1.fit_image_path_validate is not None
+    assert p1.fit_image_path_validate != p1.fit_image_path
 
     # Add a third program p3
     p3 = Program(

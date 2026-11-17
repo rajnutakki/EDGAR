@@ -180,6 +180,8 @@ class Program:
             fingerprint of the model's output, used for deduplication.
         params: The optimized parameters of the model (as a nested dictionary of NumPy arrays/scalars).
         params_init: The initial parameters of the model (as a nested dictionary of NumPy arrays/scalars).
+        params_validate: Optimized validation parameters; `params` remains discover-only.
+        params_init_validate: Initial validation parameters.
         sample_losses: A numpy array of per-sample loss values (without penalty)
             for the optimized parameters.
         sample_losses_init: A numpy array of per-sample loss values (without penalty)
@@ -190,6 +192,7 @@ class Program:
         idx: A globally unique index assigned to the program within the `Population`.
         rank: The final rank of the program based on its validation loss.
         best_estimator_idx: The index of the parameter estimator (from `code.param_est`) that yielded the best score.
+        best_estimator_idx_validate: Validation split's selected estimator index.
         data: The data dictionary used for resolving dynamic default parameters.
         _default_params: Internal storage for the model's default parameters,
             which can be a dictionary or a callable.
@@ -204,14 +207,19 @@ class Program:
     eval_fingerprint: np.ndarray | None = field(default=None, repr=False)
     params: dict | None = field(default=None, repr=False)
     params_init: dict | None = field(default=None, repr=False)
+    params_validate: dict | None = field(default=None, repr=False)
+    params_init_validate: dict | None = field(default=None, repr=False)
     sample_losses: np.ndarray | None = field(default=None, repr=False)
     sample_losses_init: np.ndarray | None = field(default=None, repr=False)
     image_path: str | None = None
     fit_image_path: str | None = None
+    fit_image_path_validate: str | None = None
     trajectory_image_path: str | None = None
     idx: int | None = field(default=None, init=False)
     rank: int | None = None
     best_estimator_idx: int | None = None
+    best_estimator_idx_validate: int | None = None
+    best_param_est_validate: str | None = field(default=None, repr=False)
     data: dict | None = field(default=None, repr=False)
     diagnostics: dict = field(default_factory=dict)
     _default_params: dict | Callable | None = None
@@ -222,6 +230,8 @@ class Program:
             "eval_fingerprint",
             "params",
             "params_init",
+            "params_validate",
+            "params_init_validate",
             "sample_losses",
             "sample_losses_init",
             "diagnostics",
