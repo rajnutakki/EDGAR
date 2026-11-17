@@ -93,7 +93,6 @@ class TestPopulation:
         record.pop("params_validate")
         record.pop("params_init_validate")
         record.pop("best_estimator_idx_validate")
-        record.pop("best_param_est_validate")
         record.pop("fit_image_path_validate")
         record["program_losses"]["validate"]["final"] = 1.0
         path.write_text(json.dumps(record) + "\n")

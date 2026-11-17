@@ -57,8 +57,7 @@ class BaseDiagnostics:
         over values on Program objects. Only when an entire argument is `None`
         may a plotter use Program defaults. `data` belongs to the requested split;
         callers may pass the same Program more than once with distinct parameters.
-        Explicit `sample_losses=[None, ...]` means unavailable, not a request to
-        fall back to discover sample losses.
+        Explicit `sample_losses=[None, ...]` means unavailable
 
         Args:
             data: NumPy dictionary of data.

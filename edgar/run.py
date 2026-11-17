@@ -295,8 +295,6 @@ async def run(
                 apply_model_fn=spec.apply_model_fn,
                 fingerprint_fn=spec.fingerprint_fn,
             )
-            # Validation fits use the validation parameters and validation test data;
-            # failures are contained by the plotting helper and never fail a run.
             generate_program_fits(spec, X_validate[1], population, split="validate")
             rank(population)
             metrics.finish_generation()

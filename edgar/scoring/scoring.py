@@ -767,8 +767,6 @@ def _apply_score_result(program: Program, result: tuple, split: str) -> str:
     if best_idx is not None:
         if split == "validate":
             program.best_estimator_idx_validate = best_idx
-            if program.code.param_est:
-                program.best_param_est_validate = program.code.param_est[best_idx]
         else:
             program.best_estimator_idx = best_idx
             if program.code.param_est:

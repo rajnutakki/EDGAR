@@ -299,9 +299,7 @@ class Population:
                     )
                     raw_params = raw_params_init = None
                     legacy_best_idx = d.get("best_estimator_idx")
-                    legacy_best_est = d.get("code", {}).get("best_param_est")
                     d["best_estimator_idx_validate"] = legacy_best_idx
-                    d["best_param_est_validate"] = legacy_best_est
                     d["best_estimator_idx"] = None
                     d["code"]["best_param_est"] = None
                 else:
@@ -363,7 +361,6 @@ class Population:
                     rank=d.get("rank"),
                     best_estimator_idx=d.get("best_estimator_idx"),
                     best_estimator_idx_validate=d.get("best_estimator_idx_validate"),
-                    best_param_est_validate=d.get("best_param_est_validate"),
                     diagnostics=d.get("diagnostics", {}),
                 )
                 pop.add(program)

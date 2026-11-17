@@ -432,8 +432,7 @@ for program, model_params in zip(programs, params):
 ```
 
 Fit images are written to `image_fit/discover/P….png` and
-`image_fit/validate/P….png`. The dashboard continues to read discover images
-from the legacy `image_fits/P….png` location when the new path is absent.
+`image_fit/validate/P….png`.
 
 ### 7. Validate
 

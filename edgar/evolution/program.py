@@ -187,7 +187,8 @@ class Program:
         sample_losses_init: A numpy array of per-sample loss values (without penalty)
             for the initial parameters.
         image_path: Path to a generated feedback image for the LLM.
-        fit_image_path: Path to an image visualizing the model's fit to data.
+        fit_image_path: Path to an image visualizing the model's discover fit to data.
+        fit_image_path_validate: Path to an image visualizing the model's validation fit to data.
         trajectory_image_path: Path to an image visualizing the model's optimization trajectories.
         idx: A globally unique index assigned to the program within the `Population`.
         rank: The final rank of the program based on its validation loss.
@@ -219,7 +220,6 @@ class Program:
     rank: int | None = None
     best_estimator_idx: int | None = None
     best_estimator_idx_validate: int | None = None
-    best_param_est_validate: str | None = field(default=None, repr=False)
     data: dict | None = field(default=None, repr=False)
     diagnostics: dict = field(default_factory=dict)
     _default_params: dict | Callable | None = None

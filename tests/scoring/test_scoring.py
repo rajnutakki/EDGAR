@@ -78,7 +78,7 @@ def test_validation_score_keeps_discover_parameters_and_estimator():
     np.testing.assert_array_equal(p.params_validate["w"], [4.0])
     np.testing.assert_array_equal(p.params_init_validate["w"], [3.0])
     assert p.best_estimator_idx_validate == 1
-    assert p.best_param_est_validate == "validate-est"
+    assert p.code.param_est[p.best_estimator_idx_validate] == "validate-est"
 
 
 # --- shared fixtures ---
